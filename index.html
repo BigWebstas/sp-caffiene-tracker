@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Caffeine Tracker</title>
+<style>
+  body {
+    padding: var(--s3);
+    font-family: var(--font-primary-stack);
+    color: var(--text-color);
+  }
+
+  h1 {
+    font-size: 18px;
+    margin: 0 0 var(--s3) 0;
+  }
+
+  .card {
+    margin-bottom: var(--s3);
+  }
+
+  .level-card {
+    text-align: center;
+    padding: var(--s3);
+  }
+
+  .level-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--text-color-muted);
+  }
+
+  .level-mg {
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--c-primary);
+    line-height: 1;
+    transition: color 0.3s ease-out;
+  }
+
+  .level-sub {
+    margin-top: var(--s-half);
+    color: var(--text-color-muted);
+    font-size: 13px;
+  }
+
+  .gauge-timestamp {
+    font-size: 11px;
+    color: var(--text-color-muted);
+    margin-bottom: var(--s-half);
+  }
+
+  .gauge-canvas {
+    width: 100%;
+    height: 130px;
+    display: block;
+  }
+
+  .gauge-stats {
+    display: flex;
+    justify-content: space-around;
+    margin-top: var(--s2);
+  }
+
+  .gauge-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .gauge-stat .stat-label {
+    font-size: 11px;
+    color: var(--text-color-muted);
+  }
+
+  .gauge-stat .stat-value {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .gauge-stat.container .stat-value {
+    color: var(--c-primary);
+  }
+
+  .gauge-stat.metabolized .stat-value {
+    color: var(--text-color-muted);
+  }
+
+  .quick-add {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--s);
+    padding: var(--s2);
+  }
+
+  .quick-add button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--s);
+  }
+
+  .quick-add .drink-emoji {
+    font-size: 20px;
+  }
+
+  .quick-add .drink-mg {
+    font-size: 11px;
+    color: var(--text-color-muted);
+  }
+
+  .custom-form {
+    display: flex;
+    gap: var(--s);
+    padding: var(--s2);
+    flex-wrap: wrap;
+  }
+
+  .custom-form input {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .chart-wrap {
+    padding: var(--s2);
+  }
+
+  canvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+  }
+
+  .chart-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-color-muted);
+    margin-top: var(--s-half);
+  }
+
+  .history {
+    padding: var(--s2);
+  }
+
+  .history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-half) 0;
+    border-bottom: 1px solid var(--divider-color);
+    font-size: 13px;
+  }
+
+  .history-row:last-child {
+    border-bottom: none;
+  }
+
+  .history-row .meta {
+    color: var(--text-color-muted);
+    font-size: 12px;
+  }
+
+  .history-row button {
+    padding: 2px var(--s);
+    font-size: 12px;
+  }
+
+  .empty-state {
+    color: var(--text-color-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: var(--s2);
+  }
+
+  .settings {
+    display: flex;
+    gap: var(--s2);
+    padding: var(--s2);
+    flex-wrap: wrap;
+  }
+
+  .settings label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: var(--text-color-muted);
+  }
+
+  .settings input {
+    width: 80px;
+  }
+
+  .manage-drinks {
+    padding: var(--s2);
+  }
+
+  .drink-row,
+  .drink-row-labels {
+    display: grid;
+    grid-template-columns: 36px 1fr 90px 64px 68px;
+    align-items: center;
+    column-gap: var(--s);
+  }
+
+  .drink-row {
+    padding: var(--s-half) 0;
+    border-bottom: 1px solid var(--divider-color);
+  }
+
+  .drink-row:last-child {
+    border-bottom: none;
+  }
+
+  .emoji-picker-btn {
+    width: 100%;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .emoji-popover {
+    position: fixed;
+    z-index: 1000;
+    background: var(--card-bg);
+    border: 1px solid var(--divider-color);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--card-shadow);
+    padding: var(--s);
+    display: none;
+  }
+
+  .emoji-popover.open {
+    display: block;
+  }
+
+  .emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 2px;
+    max-width: 216px;
+  }
+
+  .emoji-grid button {
+    font-size: 18px;
+    line-height: 1;
+    padding: var(--s-half);
+    background: transparent;
+    border: none;
+  }
+
+  .emoji-grid button:hover {
+    background: var(--divider-color);
+  }
+
+  .drink-row .drink-label-input,
+  .drink-row .drink-mg-input,
+  .drink-row .drink-time-input {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .drink-row .drink-action-btn {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+
+  .drink-row-labels {
+    padding-bottom: var(--s-half);
+    font-size: 11px;
+    color: var(--text-color-muted);
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    padding: var(--s2) var(--s2) 0 var(--s2);
+    color: var(--text-color-muted);
+  }
+
+  .chart-canvas-wrap,
+  .gauge-canvas-wrap {
+    position: relative;
+  }
+
+  .pulse-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--pulse-color, var(--c-primary));
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: background-color 0.3s ease-out;
+  }
+
+  .pulse-dot.active {
+    opacity: 1;
+  }
+
+  .pulse-dot::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: var(--pulse-color, var(--c-primary));
+    opacity: 0.55;
+    animation: chart-pulse 1.8s ease-out infinite;
+  }
+
+  @keyframes chart-pulse {
+    0% {
+      transform: scale(0.4);
+      opacity: 0.55;
+    }
+    70% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes flash-highlight {
+    0% {
+      box-shadow: 0 0 0 0 var(--c-primary);
+    }
+    100% {
+      box-shadow: 0 0 0 10px transparent;
+    }
+  }
+
+  .card.flash {
+    animation: flash-highlight 0.6s ease-out;
+  }
+</style>
+</head>
+<body>
+  <h1>☕ Caffeine Tracker</h1>
+
+  <div class="card level-card">
+    <div class="gauge-timestamp" id="gaugeTimestamp"></div>
+    <div class="gauge-canvas-wrap">
+      <canvas id="gauge" class="gauge-canvas"></canvas>
+      <div class="pulse-dot" id="gaugePulseDot"></div>
+    </div>
+    <div class="level-label">Remaining in your system</div>
+    <div class="level-mg" id="currentLevel">0 mg</div>
+    <div class="level-sub" id="currentSub">No caffeine logged today</div>
+    <div class="gauge-stats">
+      <div class="gauge-stat container">
+        <span class="stat-label">Left in cup</span>
+        <span class="stat-value" id="containerStat">None in progress</span>
+      </div>
+      <div class="gauge-stat metabolized">
+        <span class="stat-label">Metabolized</span>
+        <span class="stat-value" id="metabolizedStat">0 mg</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Quick add</div>
+  <div class="card quick-add" id="quickAdd"></div>
+
+  <div class="section-title">Custom</div>
+  <div class="card custom-form">
+    <input type="text" id="customName" placeholder="Drink name" />
+    <input type="number" id="customMg" placeholder="mg" min="1" />
+    <button class="btn-primary" id="customAddBtn">Add</button>
+  </div>
+
+  <div class="section-title">Decay curve (next 18h)</div>
+  <div class="card chart-wrap">
+    <div class="chart-canvas-wrap">
+      <canvas id="chart"></canvas>
+      <div class="pulse-dot" id="chartPulseDot"></div>
+    </div>
+    <div class="chart-legend">
+      <span id="chartLegendStart">-4h</span>
+      <span id="chartLegendNow">now</span>
+      <span id="chartLegendEnd">+18h</span>
+    </div>
+  </div>
+
+  <div class="section-title">Today's log</div>
+  <div class="card history" id="history"></div>
+
+  <div class="section-title">Settings</div>
+  <div class="card settings">
+    <label>
+      Half-life (hours)
+      <input type="number" id="halfLifeInput" min="2" max="10" step="0.5" />
+    </label>
+    <label>
+      Sleep threshold (mg)
+      <input type="number" id="thresholdInput" min="0" max="400" step="5" />
+    </label>
+  </div>
+
+  <div class="section-title">Manage drinks</div>
+  <div class="card manage-drinks">
+    <div class="drink-row-labels">
+      <span></span>
+      <span>Name</span>
+      <span>mg</span>
+      <span>min</span>
+      <span></span>
+    </div>
+    <div id="drinkList"></div>
+    <div class="drink-row" id="addDrinkRow">
+      <button type="button" class="emoji-picker-btn" id="newDrinkEmojiBtn">☕</button>
+      <input type="text" class="drink-label-input" id="newDrinkLabel" placeholder="Drink name" />
+      <input type="number" class="drink-mg-input" id="newDrinkMg" placeholder="mg" min="1" />
+      <input type="number" class="drink-time-input" id="newDrinkTime" placeholder="0" min="0" max="120" title="Minutes to consume (0 = instant)" />
+      <button class="btn-primary drink-action-btn" id="addDrinkBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="emoji-popover" id="emojiPopover">
+    <div class="emoji-grid" id="emojiGrid"></div>
+  </div>
+
+  <script>
+    const p = PluginAPI;
+
+    const DEFAULT_DRINKS = [
+      { id: 'coffee', label: 'Coffee', emoji: '☕', mg: 95, drinkTimeMin: 15 },
+      { id: 'espresso', label: 'Espresso', emoji: '⚡', mg: 63, drinkTimeMin: 2 },
+      { id: 'tea', label: 'Black Tea', emoji: '🍵', mg: 47, drinkTimeMin: 12 },
+      { id: 'energy', label: 'Energy Drink', emoji: '🥫', mg: 80, drinkTimeMin: 10 },
+      { id: 'soda', label: 'Soda', emoji: '🥤', mg: 34, drinkTimeMin: 15 },
+      { id: 'preworkout', label: 'Pre-Workout', emoji: '💊', mg: 200, drinkTimeMin: 5 },
+    ];
+
+    function newId() {
+      return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    const EMOJI_CHOICES = [
+      '☕', '⚡', '🍵', '🥤', '🥫', '💊',
+      '🧃', '🧋', '🥛', '🍶', '🧉', '🍺',
+      '🍷', '🥃', '🍹', '🍸', '🧊', '🌿',
+      '🍫', '🥤', '🫖', '🧁', '🍯', '💉',
+    ];
+
+    let newDrinkEmoji = '☕';
+    let emojiPickerOnSelect = null;
+
+    function openEmojiPicker(anchorEl, onSelect) {
+      const popover = document.getElementById('emojiPopover');
+      const grid = document.getElementById('emojiGrid');
+      grid.innerHTML = '';
+      for (const emoji of EMOJI_CHOICES) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = emoji;
+        btn.addEventListener('click', () => {
+          onSelect(emoji);
+          closeEmojiPicker();
+        });
+        grid.appendChild(btn);
+      }
+      const rect = anchorEl.getBoundingClientRect();
+      popover.style.top = `${rect.bottom + 4}px`;
+      popover.style.left = `${rect.left}px`;
+      popover.classList.add('open');
+      emojiPickerOnSelect = onSelect;
+    }
+
+    function closeEmojiPicker() {
+      document.getElementById('emojiPopover').classList.remove('open');
+      emojiPickerOnSelect = null;
+    }
+
+    document.addEventListener('click', (ev) => {
+      const popover = document.getElementById('emojiPopover');
+      if (!popover.classList.contains('open')) return;
+      if (popover.contains(ev.target) || ev.target.classList.contains('emoji-picker-btn')) return;
+      closeEmojiPicker();
+    });
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') closeEmojiPicker();
+    });
+
+    let state = {
+      halfLifeHours: 5,
+      threshold: 50,
+      entries: [],
+      drinks: DEFAULT_DRINKS.map((d) => ({ ...d })),
+    };
+    let refreshTimer = null;
+
+    // Each entry's mg is treated as consumed at a constant rate over
+    // `drinkTimeMin` minutes (0 = instant), with every already-consumed
+    // fraction decaying independently from the moment it was consumed.
+    // Closed-form integral of the instant-dose decay model over that window.
+    function entryLevelAt(e, tsMs) {
+      const H = state.halfLifeHours * 3600000;
+      const t0 = e.time;
+      if (tsMs < t0) return 0;
+
+      const D = (e.drinkTimeMin || 0) * 60000;
+      if (D <= 0) {
+        return e.mg * Math.pow(2, (t0 - tsMs) / H);
+      }
+
+      const u = Math.min(tsMs, t0 + D);
+      const rate = e.mg / D;
+      const k = Math.LN2 / H;
+      return (rate / k) * (Math.pow(2, (u - tsMs) / H) - Math.pow(2, (t0 - tsMs) / H));
+    }
+
+    function levelAt(tsMs) {
+      let total = 0;
+      for (const e of state.entries) {
+        total += entryLevelAt(e, tsMs);
+      }
+      return total;
+    }
+
+    // How much of an in-progress drink hasn't been sipped yet, assuming a
+    // constant consumption rate over its drinkTimeMin window. Entries with
+    // no drink time (instant) or already fully consumed don't count.
+    function containerStatus(tsMs) {
+      let totalMg = 0;
+      let leftMg = 0;
+      for (const e of state.entries) {
+        const D = (e.drinkTimeMin || 0) * 60000;
+        if (D <= 0) continue;
+        const elapsed = tsMs - e.time;
+        if (elapsed >= D) continue;
+        const consumedFrac = Math.max(elapsed, 0) / D;
+        totalMg += e.mg;
+        leftMg += e.mg * (1 - consumedFrac);
+      }
+      return { totalMg, leftMg };
+    }
+
+    function timeUntilBelow(threshold) {
+      const now = Date.now();
+      if (levelAt(now) < threshold) return 0;
+      const stepMs = 5 * 60 * 1000;
+      for (let t = stepMs; t <= 24 * 3600 * 1000; t += stepMs) {
+        if (levelAt(now + t) < threshold) return t;
+      }
+      return null;
+    }
+
+    function fmtDuration(ms) {
+      const totalMin = Math.round(ms / 60000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      if (h <= 0) return `${m}m`;
+      return `${h}h ${m}m`;
+    }
+
+    function fmtTime(tsMs) {
+      const d = new Date(tsMs);
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function isSameDay(aMs, bMs) {
+      const a = new Date(aMs);
+      const b = new Date(bMs);
+      return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+      );
+    }
+
+    // Time label for a chart point; prefixes the weekday when it falls on a
+    // different calendar day than `nowMs` (the curve can span past midnight).
+    function fmtChartLabel(tsMs, nowMs) {
+      const time = fmtTime(tsMs);
+      if (isSameDay(tsMs, nowMs)) return time;
+      const weekday = new Date(tsMs).toLocaleDateString(undefined, { weekday: 'short' });
+      return `${weekday} ${time}`;
+    }
+
+    function updateClock() {
+      const now = Date.now();
+      const dateStr = new Date(now).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      document.getElementById('gaugeTimestamp').textContent = `${dateStr} · ${fmtTime(now)}`;
+    }
+
+    async function load() {
+      try {
+        const raw = await p.loadSyncedData();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          state = { ...state, ...parsed };
+        }
+      } catch (e) {
+        console.error('[Caffeine Tracker] failed to load data', e);
+      }
+      const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+      state.entries = (state.entries || []).filter((e) => e.time >= cutoff);
+      if (!state.drinks || state.drinks.length === 0) {
+        state.drinks = DEFAULT_DRINKS.map((d) => ({ ...d }));
+      }
+      renderQuickAdd();
+      renderSettings();
+      renderAll();
+    }
+
+    async function save() {
+      try {
+        await p.persistDataSynced(JSON.stringify(state));
+      } catch (e) {
+        console.error('[Caffeine Tracker] failed to save data', e);
+      }
+    }
+
+    function flashCard(el) {
+      if (!el) return;
+      el.classList.remove('flash');
+      // restart the animation even if it's already mid-flash
+      void el.offsetWidth;
+      el.classList.add('flash');
+    }
+
+    function flashDataCards() {
+      flashCard(document.querySelector('.level-card'));
+      flashCard(document.querySelector('.chart-wrap'));
+    }
+
+    function addEntry(label, mg, drinkTimeMin = 0) {
+      state.entries.push({
+        id: newId(),
+        label,
+        mg,
+        drinkTimeMin,
+        time: Date.now(),
+      });
+      save();
+      renderAll();
+      flashDataCards();
+      p.showSnack?.({ msg: `Logged ${label} (${mg} mg)`, type: 'SUCCESS' });
+    }
+
+    function deleteEntry(id) {
+      state.entries = state.entries.filter((e) => e.id !== id);
+      save();
+      renderAll();
+      flashDataCards();
+    }
+
+    function renderQuickAdd() {
+      const wrap = document.getElementById('quickAdd');
+      wrap.innerHTML = '';
+      for (const d of state.drinks) {
+        const btn = document.createElement('button');
+        btn.innerHTML = `<span class="drink-emoji">${d.emoji}</span><span>${d.label}</span><span class="drink-mg">${d.mg} mg</span>`;
+        btn.addEventListener('click', () => addEntry(d.label, d.mg, d.drinkTimeMin || 0));
+        wrap.appendChild(btn);
+      }
+    }
+
+    function addDrink(emoji, label, mg, drinkTimeMin = 0) {
+      state.drinks.push({ id: newId(), emoji: emoji || '☕', label, mg, drinkTimeMin });
+      save();
+      renderQuickAdd();
+      renderManageDrinks();
+    }
+
+    function updateDrinkField(id, field, value) {
+      const d = state.drinks.find((x) => x.id === id);
+      if (!d) return;
+      d[field] = value;
+      save();
+      renderQuickAdd();
+    }
+
+    function removeDrink(id) {
+      state.drinks = state.drinks.filter((d) => d.id !== id);
+      save();
+      renderQuickAdd();
+      renderManageDrinks();
+    }
+
+    function renderManageDrinks() {
+      const wrap = document.getElementById('drinkList');
+      wrap.innerHTML = '';
+      for (const d of state.drinks) {
+        const row = document.createElement('div');
+        row.className = 'drink-row';
+
+        const emojiBtn = document.createElement('button');
+        emojiBtn.type = 'button';
+        emojiBtn.className = 'emoji-picker-btn';
+        emojiBtn.textContent = d.emoji;
+        emojiBtn.addEventListener('click', () =>
+          openEmojiPicker(emojiBtn, (emoji) => {
+            emojiBtn.textContent = emoji;
+            updateDrinkField(d.id, 'emoji', emoji);
+          }),
+        );
+
+        const labelInput = document.createElement('input');
+        labelInput.className = 'drink-label-input';
+        labelInput.value = d.label;
+        labelInput.addEventListener('change', (ev) => {
+          const val = ev.target.value.trim();
+          if (val) updateDrinkField(d.id, 'label', val);
+          else ev.target.value = d.label;
+        });
+
+        const mgInput = document.createElement('input');
+        mgInput.type = 'number';
+        mgInput.className = 'drink-mg-input';
+        mgInput.min = '1';
+        mgInput.value = d.mg;
+        mgInput.addEventListener('change', (ev) => {
+          const val = parseFloat(ev.target.value);
+          if (val > 0) updateDrinkField(d.id, 'mg', val);
+          else ev.target.value = d.mg;
+        });
+
+        const timeInput = document.createElement('input');
+        timeInput.type = 'number';
+        timeInput.className = 'drink-time-input';
+        timeInput.title = 'Minutes to consume (0 = instant)';
+        timeInput.min = '0';
+        timeInput.max = '120';
+        timeInput.value = d.drinkTimeMin || 0;
+        timeInput.addEventListener('change', (ev) => {
+          const val = parseFloat(ev.target.value);
+          if (val >= 0) updateDrinkField(d.id, 'drinkTimeMin', val);
+          else ev.target.value = d.drinkTimeMin || 0;
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'drink-action-btn';
+        delBtn.textContent = 'Remove';
+        delBtn.addEventListener('click', () => removeDrink(d.id));
+
+        row.appendChild(emojiBtn);
+        row.appendChild(labelInput);
+        row.appendChild(mgInput);
+        row.appendChild(timeInput);
+        row.appendChild(delBtn);
+        wrap.appendChild(row);
+      }
+    }
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function drawGauge(remaining, totalDosed) {
+      const canvas = document.getElementById('gauge');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(rect.width, 160);
+      const h = 130;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const metabolized = Math.max(totalDosed - remaining, 0);
+      const remainingFrac = totalDosed > 0 ? Math.min(remaining / totalDosed, 1) : 0;
+
+      const cx = w / 2;
+      const cy = h - 10;
+      const r = Math.min(w / 2 - 16, h - 24);
+      const lineWidth = 14;
+
+      const styles = getComputedStyle(document.documentElement);
+      const track = styles.getPropertyValue('--divider-color').trim() || '#ccc';
+      const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
+      const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
+
+      ctx.lineCap = 'round';
+      ctx.lineWidth = lineWidth;
+
+      ctx.strokeStyle = track;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, Math.PI, 2 * Math.PI, false);
+      ctx.stroke();
+
+      const tipColor = remaining > 400 ? warn : primary;
+      const endAngle = Math.PI + remainingFrac * Math.PI;
+      ctx.strokeStyle = tipColor;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, Math.PI, endAngle, false);
+      ctx.stroke();
+
+      const gaugeDot = document.getElementById('gaugePulseDot');
+      if (totalDosed > 0) {
+        gaugeDot.style.left = `${cx + r * Math.cos(endAngle)}px`;
+        gaugeDot.style.top = `${cy + r * Math.sin(endAngle)}px`;
+        gaugeDot.style.setProperty('--pulse-color', tipColor);
+        gaugeDot.classList.add('active');
+      } else {
+        gaugeDot.classList.remove('active');
+      }
+
+      const remainingPct = totalDosed > 0 ? Math.round((remaining / totalDosed) * 100) : 0;
+      const metabolizedPct = totalDosed > 0 ? 100 - remainingPct : 0;
+      document.getElementById('metabolizedStat').textContent = `${Math.round(metabolized)} mg · ${metabolizedPct}%`;
+
+      const { totalMg: cupTotal, leftMg: cupLeft } = containerStatus(Date.now());
+      const containerStat = document.getElementById('containerStat');
+      if (cupTotal > 0) {
+        const cupPct = Math.round((cupLeft / cupTotal) * 100);
+        containerStat.textContent = `${Math.round(cupLeft)} mg · ${cupPct}%`;
+      } else {
+        containerStat.textContent = 'None in progress';
+      }
+    }
+
+    const GAUGE_ANIM_MS = 600;
+    let gaugeAnimFrame = null;
+    let gaugeDisplayed = { remaining: 0, totalDosed: 0 };
+
+    function renderGauge() {
+      const targetTotalDosed = state.entries.reduce((s, e) => s + e.mg, 0);
+      const targetRemaining = levelAt(Date.now());
+
+      if (gaugeAnimFrame) cancelAnimationFrame(gaugeAnimFrame);
+      const from = { ...gaugeDisplayed };
+      const to = { remaining: targetRemaining, totalDosed: targetTotalDosed };
+      const start = performance.now();
+
+      const tick = (now) => {
+        const t = Math.min((now - start) / GAUGE_ANIM_MS, 1);
+        const eased = easeOutCubic(t);
+        const remaining = from.remaining + (to.remaining - from.remaining) * eased;
+        const totalDosed = from.totalDosed + (to.totalDosed - from.totalDosed) * eased;
+        gaugeDisplayed = { remaining, totalDosed };
+        drawGauge(remaining, totalDosed);
+        if (t < 1) {
+          gaugeAnimFrame = requestAnimationFrame(tick);
+        } else {
+          gaugeAnimFrame = null;
+        }
+      };
+      gaugeAnimFrame = requestAnimationFrame(tick);
+    }
+
+    function renderLevel() {
+      const now = Date.now();
+      const level = levelAt(now);
+      document.getElementById('currentLevel').textContent = `${Math.round(level)} mg`;
+
+      const sub = document.getElementById('currentSub');
+      if (state.entries.length === 0) {
+        sub.textContent = 'No caffeine logged today';
+      } else if (level < state.threshold) {
+        sub.textContent = `Below your ${state.threshold} mg threshold`;
+      } else {
+        const remaining = timeUntilBelow(state.threshold);
+        sub.textContent =
+          remaining === null
+            ? `Won't drop below ${state.threshold} mg within 24h`
+            : `${fmtDuration(remaining)} until under ${state.threshold} mg`;
+      }
+    }
+
+    function renderHistory() {
+      const wrap = document.getElementById('history');
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todays = state.entries
+        .filter((e) => e.time >= todayStart.getTime())
+        .sort((a, b) => b.time - a.time);
+
+      if (todays.length === 0) {
+        wrap.innerHTML = '<div class="empty-state">Nothing logged yet today</div>';
+        return;
+      }
+
+      wrap.innerHTML = '';
+      for (const e of todays) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        const rampNote = e.drinkTimeMin > 0 ? ` · sipped over ${e.drinkTimeMin}m` : '';
+        row.innerHTML = `
+          <span>${e.label} <span class="meta">${e.mg} mg · ${fmtTime(e.time)}${rampNote}</span></span>
+        `;
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Remove';
+        delBtn.addEventListener('click', () => deleteEntry(e.id));
+        row.appendChild(delBtn);
+        wrap.appendChild(row);
+      }
+    }
+
+    function renderChart() {
+      const canvas = document.getElementById('chart');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(rect.width, 200);
+      const h = 160;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const now = Date.now();
+      const startMs = now - 4 * 3600000;
+      const endMs = now + 18 * 3600000;
+      const stepMs = 15 * 60000;
+
+      document.getElementById('chartLegendStart').textContent = fmtChartLabel(startMs, now);
+      document.getElementById('chartLegendNow').textContent = `Now · ${fmtTime(now)}`;
+      document.getElementById('chartLegendEnd').textContent = fmtChartLabel(endMs, now);
+
+      const points = [];
+      let maxMg = state.threshold;
+      for (let t = startMs; t <= endMs; t += stepMs) {
+        const lvl = levelAt(t);
+        points.push([t, lvl]);
+        if (lvl > maxMg) maxMg = lvl;
+      }
+      maxMg *= 1.15;
+
+      const padL = 8;
+      const padR = 8;
+      const padT = 10;
+      const padB = 10;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+
+      const xOf = (t) => padL + ((t - startMs) / (endMs - startMs)) * plotW;
+      const yOf = (mg) => padT + plotH - (mg / maxMg) * plotH;
+
+      const styles = getComputedStyle(document.documentElement);
+      const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
+      const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
+      const accent = styles.getPropertyValue('--c-accent').trim() || '#22c55e';
+      const divider = styles.getPropertyValue('--divider-color').trim() || '#ccc';
+      const muted = styles.getPropertyValue('--text-color-muted').trim() || '#888';
+
+      // next time the level drops below the sleep threshold, if it falls
+      // within the visible window
+      const untilBelow = timeUntilBelow(state.threshold);
+      const crossMs = untilBelow !== null && untilBelow > 0 ? now + untilBelow : null;
+      const showCrossing = crossMs !== null && crossMs <= endMs;
+
+      // threshold line
+      ctx.strokeStyle = warn;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, yOf(state.threshold));
+      ctx.lineTo(w - padR, yOf(state.threshold));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // now line
+      ctx.strokeStyle = divider;
+      ctx.beginPath();
+      ctx.moveTo(xOf(now), padT);
+      ctx.lineTo(xOf(now), padT + plotH);
+      ctx.stroke();
+
+      // crossing line: when the level drops under the sleep threshold
+      if (showCrossing) {
+        ctx.strokeStyle = accent;
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(xOf(crossMs), padT);
+        ctx.lineTo(xOf(crossMs), padT + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // decay curve
+      ctx.strokeStyle = primary;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach(([t, mg], i) => {
+        const x = xOf(t);
+        const y = yOf(mg);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // fill under curve up to now
+      ctx.fillStyle = primary + '22';
+      ctx.beginPath();
+      points.forEach(([t, mg], i) => {
+        const x = xOf(t);
+        const y = yOf(mg);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(xOf(points[points.length - 1][0]), padT + plotH);
+      ctx.lineTo(xOf(points[0][0]), padT + plotH);
+      ctx.closePath();
+      ctx.fill();
+
+      // current point
+      ctx.fillStyle = primary;
+      ctx.beginPath();
+      ctx.arc(xOf(now), yOf(levelAt(now)), 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      const pulseDot = document.getElementById('chartPulseDot');
+      pulseDot.style.left = `${xOf(now)}px`;
+      pulseDot.style.top = `${yOf(levelAt(now))}px`;
+      pulseDot.classList.add('active');
+
+      if (showCrossing) {
+        const crossX = xOf(crossMs);
+        const crossY = yOf(levelAt(crossMs));
+
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(crossX, crossY, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        const label = fmtChartLabel(crossMs, now);
+        ctx.font = '11px sans-serif';
+        const labelW = ctx.measureText(label).width;
+        const nearRightEdge = crossX + labelW / 2 + padR > w;
+        const nearLeftEdge = crossX - labelW / 2 < padL;
+        ctx.textAlign = nearRightEdge ? 'right' : nearLeftEdge ? 'left' : 'center';
+        const labelX = nearRightEdge ? w - padR : nearLeftEdge ? padL : crossX;
+        ctx.fillText(label, labelX, padT + 10);
+      }
+    }
+
+    function renderSettings() {
+      document.getElementById('halfLifeInput').value = state.halfLifeHours;
+      document.getElementById('thresholdInput').value = state.threshold;
+      renderManageDrinks();
+    }
+
+    function renderAll() {
+      renderLevel();
+      renderGauge();
+      renderHistory();
+      renderChart();
+    }
+
+    document.getElementById('customAddBtn').addEventListener('click', () => {
+      const nameEl = document.getElementById('customName');
+      const mgEl = document.getElementById('customMg');
+      const name = nameEl.value.trim() || 'Custom';
+      const mg = parseFloat(mgEl.value);
+      if (!mg || mg <= 0) {
+        p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
+        return;
+      }
+      addEntry(name, mg);
+      nameEl.value = '';
+      mgEl.value = '';
+    });
+
+    document.getElementById('halfLifeInput').addEventListener('change', (ev) => {
+      const val = parseFloat(ev.target.value);
+      if (val >= 2 && val <= 10) {
+        state.halfLifeHours = val;
+        save();
+        renderAll();
+        flashDataCards();
+      }
+    });
+
+    document.getElementById('thresholdInput').addEventListener('change', (ev) => {
+      const val = parseFloat(ev.target.value);
+      if (val >= 0 && val <= 400) {
+        state.threshold = val;
+        save();
+        renderAll();
+        flashDataCards();
+      }
+    });
+
+    const newDrinkEmojiBtn = document.getElementById('newDrinkEmojiBtn');
+    newDrinkEmojiBtn.addEventListener('click', () =>
+      openEmojiPicker(newDrinkEmojiBtn, (emoji) => {
+        newDrinkEmoji = emoji;
+        newDrinkEmojiBtn.textContent = emoji;
+      }),
+    );
+
+    document.getElementById('addDrinkBtn').addEventListener('click', () => {
+      const labelEl = document.getElementById('newDrinkLabel');
+      const mgEl = document.getElementById('newDrinkMg');
+      const timeEl = document.getElementById('newDrinkTime');
+      const label = labelEl.value.trim();
+      const mg = parseFloat(mgEl.value);
+      const drinkTimeMin = Math.max(parseFloat(timeEl.value) || 0, 0);
+      if (!label) {
+        p.showSnack?.({ msg: 'Enter a drink name', type: 'ERROR' });
+        return;
+      }
+      if (!mg || mg <= 0) {
+        p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
+        return;
+      }
+      addDrink(newDrinkEmoji, label, mg, drinkTimeMin);
+      newDrinkEmoji = '☕';
+      newDrinkEmojiBtn.textContent = '☕';
+      labelEl.value = '';
+      mgEl.value = '';
+      timeEl.value = '';
+    });
+
+    window.addEventListener('resize', () => {
+      renderGauge();
+      renderChart();
+    });
+
+    p.registerHook?.(p.Hooks.PERSISTED_DATA_CHANGED, load);
+
+    p.onReady(() => {
+      renderQuickAdd();
+      load();
+      updateClock();
+      refreshTimer = setInterval(renderAll, 5000);
+      setInterval(updateClock, 1000);
+    });
+  </script>
+</body>
+</html>

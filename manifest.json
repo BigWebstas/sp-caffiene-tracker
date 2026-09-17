@@ -1,0 +1,21 @@
+{
+  "id": "caffeine-tracker",
+  "name": "Caffeine Tracker",
+  "version": "1.8.0",
+  "description": "Log caffeine intake and simulate blood caffeine level decay over time using a half-life model",
+  "manifestVersion": 1,
+  "minSupVersion": "14.0.0",
+  "icon": "icon.svg",
+  "iFrame": true,
+  "sidePanel": false,
+  "uiKit": true,
+  "isSkipMenuEntry": true,
+  "permissions": [
+    "registerHeaderButton",
+    "showIndexHtmlAsView",
+    "persistDataSynced",
+    "loadSyncedData",
+    "showSnack"
+  ],
+  "hooks": []
+}
