@@ -19,22 +19,10 @@ caffeine level decay using a half-life model.
 
 ## Install
 
-1. Build the zip (see below) or use the one in `dist/`
+1. Grab a release zip
 2. In Super Productivity: **Settings → Plugins → Upload Plugin**
 3. Open it from the header button or the menu entry ("Caffeine Tracker")
 
-## Build
-
-Flat zip layout (no folder prefix), built with Python since this machine has
-no `zip` CLI:
-
-```python
-import zipfile
-files = ['icon.svg', 'index.html', 'manifest.json', 'plugin.js', 'README.md']
-with zipfile.ZipFile('dist/caffeine-tracker-v1.0.0.zip', 'w', zipfile.ZIP_DEFLATED) as z:
-    for f in files:
-        z.write(f, f)
-```
 
 ## Notes
 
