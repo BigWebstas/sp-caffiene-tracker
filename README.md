@@ -1,7 +1,7 @@
 # Caffeine Tracker
 
 A Super Productivity plugin that logs caffeine intake and simulates blood
-caffeine level decay using a half-life model.
+caffeine level decay using a half-life model, and its effects on productivity throughout the day.
 
 ## Screenshots
 
@@ -9,9 +9,11 @@ caffeine level decay using a half-life model.
   <img src="Images/desktop2.png" alt="Desktop view: gauge and quick add" width="49%" />
   <img src="Images/desktop1.png" alt="Desktop view: decay chart, log, and settings" width="49%" />
 </p>
-<img src="Images/mobile.png" alt="Mobile view" width="300" />
-<img src="Images/mobile_settings.png" alt="Mobile view" width="300" />
-<img src="Images/mobile_reports.png" alt="Mobile view" width="300" />
+    <img src="Images/mobile.png" alt="Snow" style="width:32%">
+    <img src="Images/mobile_settings.png" alt="Forest" style="width:32%">
+    <img src="Images/mobile_reports.png" alt="Mountains" style="width:32%">
+
+
 ## Features
 
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
