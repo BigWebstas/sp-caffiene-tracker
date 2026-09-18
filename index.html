@@ -10,6 +10,16 @@
     color: var(--text-color);
   }
 
+  body.is-loading .level-card,
+  body.is-loading .quick-add {
+    animation: loading-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes loading-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
   h1 {
     font-size: 18px;
     margin: 0;
@@ -103,9 +113,11 @@
     transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
   }
 
-  .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    @media (hover: hover) and (pointer: fine) {
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    }
   }
 
   .card:active {
@@ -113,10 +125,15 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
   }
 
-  .level-card {
+  .card.level-card {
     text-align: center;
     padding: var(--s3);
     position: relative;
+    background: color-mix(in srgb, var(--card-bg) 55%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid color-mix(in srgb, var(--divider-color) 50%, transparent);
+        will-change: backdrop-filter;
   }
 
   .celebration-burst {
@@ -185,8 +202,8 @@
   }
 
   .gauge-stats {
-    display: flex;
-    justify-content: space-around;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
     margin-top: var(--s2);
   }
 
@@ -232,7 +249,12 @@
     gap: 2px;
     padding: var(--s);
     transition: transform 0.1s ease-out;
+    border-left: 3px solid transparent;
   }
+
+  .quick-add button.tier-light { border-left-color: #22c55e; }
+  .quick-add button.tier-medium { border-left-color: #f59e0b; }
+  .quick-add button.tier-heavy { border-left-color: #e53935; }
 
   .quick-add button:active {
     transform: scale(0.94);
@@ -543,6 +565,7 @@
 
   .chart-canvas-wrap {
     margin-bottom: 16px;
+        isolation: isolate;
   }
 
   .now-time-label {
@@ -552,6 +575,14 @@
     font-size: 11px;
     color: var(--text-color-muted);
     white-space: nowrap;
+    pointer-events: none;
+  }
+
+    .now-line {
+    position: absolute;
+    width: 1px;
+    background: #fff;
+    mix-blend-mode: difference;
     pointer-events: none;
   }
 
@@ -624,7 +655,7 @@
   }
 </style>
 </head>
-<body>
+<body class="is-loading">
   <div class="header-row">
     <h1>☕ Caffeine Tracker</h1>
     <div class="header-actions">
@@ -676,6 +707,7 @@
       <div class="pulse-dot" id="taskPulseDot"></div>
       <div class="pulse-dot" id="habitPulseDot"></div>
       <div class="now-time-label" id="chartNowLabel"></div>
+      <div class="now-line" id="chartNowLine"></div>
       <div class="chart-reveal-mask" id="chartRevealMask"></div>
     </div>
     <div class="chart-legend">
@@ -748,6 +780,26 @@
             <canvas id="hourHeatmapChart" class="impact-canvas"></canvas>
             <div class="impact-note" id="hourHeatmapNote">Not enough data yet</div>
           </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Most-worked tag by caffeine level</div>
+            <div class="summary-list" id="tagByLevelList"></div>
+            <div class="impact-note" id="tagByLevelNote">Not enough data yet</div>
+          </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Focus-session length by caffeine level (this session only)</div>
+            <canvas id="focusSessionChart" class="impact-canvas"></canvas>
+            <div class="impact-note" id="focusSessionNote">Not enough data yet</div>
+          </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Task creation rate by caffeine level</div>
+            <canvas id="taskCreationChart" class="impact-canvas"></canvas>
+            <div class="impact-note" id="taskCreationNote">Not enough data yet</div>
+          </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Caffeine by deadline proximity</div>
+            <canvas id="deadlineProximityChart" class="impact-canvas"></canvas>
+            <div class="impact-note" id="deadlineProximityNote">Not enough data yet</div>
+          </div>
         </div>
       </div>
     </div>
@@ -814,6 +866,15 @@
       return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     }
 
+    const colorAlphaProbe = document.createElement('div');
+    function toRgba(cssColor, alpha) {
+      colorAlphaProbe.style.color = cssColor;
+      const rgb = getComputedStyle(colorAlphaProbe).color;
+      const nums = rgb.match(/[\d.]+/g);
+      if (!nums || nums.length < 3) return `rgba(0, 0, 0, ${alpha})`;
+      return `rgba(${nums[0]}, ${nums[1]}, ${nums[2]}, ${alpha})`;
+    }
+
     const EMOJI_CHOICES = [
       '☕', '⚡', '🍵', '🥤', '🥫', '💊',
       '🧃', '🧋', '🥛', '🍶', '🧉', '🍺',
@@ -866,9 +927,6 @@
       closeEmojiPicker();
     }
 
-    // Summary/impact canvases measure their own width via
-    // getBoundingClientRect(), which reads 0 while the overlay is
-    // display:none, so force a redraw right after it becomes visible.
     function openReports() {
       document.getElementById('reportsOverlay').classList.add('open');
       renderSummary();
@@ -903,14 +961,12 @@
       threshold: 50,
       entries: [],
       drinks: DEFAULT_DRINKS.map((d) => ({ ...d })),
+      habitMarks: { day: null, marks: {} },
     };
     let refreshTimer = null;
+    let hasLoadedOnce = false;
     let chartRevealed = false;
 
-    // Each entry's mg is treated as consumed at a constant rate over
-    // `drinkTimeMin` minutes (0 = instant), with every already-consumed
-    // fraction decaying independently from the moment it was consumed.
-    // Closed-form integral of the instant-dose decay model over that window.
     function entryLevelAt(e, tsMs) {
       const H = state.halfLifeHours * 3600000;
       const t0 = e.time;
@@ -935,9 +991,6 @@
       return total;
     }
 
-    // How much of an in-progress drink hasn't been sipped yet, assuming a
-    // constant consumption rate over its drinkTimeMin window. Entries with
-    // no drink time (instant) or already fully consumed don't count.
     function containerStatus(tsMs) {
       let totalMg = 0;
       let leftMg = 0;
@@ -990,8 +1043,6 @@
       );
     }
 
-    // Time label for a chart point; prefixes the weekday when it falls on a
-    // different calendar day than `nowMs` (the curve can span past midnight).
     function fmtChartLabel(tsMs, nowMs) {
       const time = fmtTime(tsMs);
       if (isSameDay(tsMs, nowMs)) return time;
@@ -1021,6 +1072,8 @@
       renderQuickAdd();
       renderSettings();
       renderAll();
+      hasLoadedOnce = true;
+      document.body.classList.remove('is-loading');
     }
 
     async function save() {
@@ -1034,7 +1087,6 @@
     function flashCard(el) {
       if (!el) return;
       el.classList.remove('flash');
-      // restart the animation even if it's already mid-flash
       void el.offsetWidth;
       el.classList.add('flash');
     }
@@ -1070,6 +1122,7 @@
       wrap.innerHTML = '';
       for (const d of state.drinks) {
         const btn = document.createElement('button');
+        btn.className = d.mg < 80 ? 'tier-light' : d.mg <= 150 ? 'tier-medium' : 'tier-heavy';
         btn.innerHTML = `<span class="drink-emoji">${d.emoji}</span><span>${d.label}</span><span class="drink-mg">${d.mg} mg</span>`;
         btn.addEventListener('click', () => addEntry(d.label, d.mg, d.drinkTimeMin || 0));
         wrap.appendChild(btn);
@@ -1167,9 +1220,6 @@
       return 1 - Math.pow(1 - t, 3);
     }
 
-    // Animates a headline mg number toward `toValue` instead of snapping,
-    // re-targeting mid-flight from wherever the previous tween left off so
-    // frequent small updates (decay ticking down) chain smoothly.
     const numberTweens = new Map();
 
     function tweenNumber(elId, toValue, suffix, durationMs = 500) {
@@ -1212,7 +1262,7 @@
       const lineWidth = 14;
 
       const styles = getComputedStyle(document.documentElement);
-      const track = styles.getPropertyValue('--divider-color').trim() || '#ccc';
+      const track = styles.getPropertyValue('--text-color-muted').trim() || '#888';
       const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
       const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
 
@@ -1288,10 +1338,6 @@
       gaugeAnimFrame = requestAnimationFrame(tick);
     }
 
-    // Consecutive days (today backward) where the level at day's end — "now"
-    // for today, 23:59:59 for past days — stayed under the sleep threshold.
-    // Stops at the first failing day or at the earliest ever logged entry,
-    // so a fresh install doesn't inherit a fake streak from empty history.
     function computeSleepStreak() {
       if (state.entries.length === 0) return 0;
       const earliestDay = new Date(Math.min(...state.entries.map((e) => e.time)));
@@ -1313,10 +1359,6 @@
       return streak;
     }
 
-    // Session-local celebration: fires once per calendar day, only on a
-    // genuine downward crossing observed during the session (not on an
-    // already-below-threshold first render), matching the same "live poll,
-    // not real history" tradeoff already used for the habit burndown line.
     let celebrationDay = null;
     let wasAboveThreshold = false;
     let hasCelebratedToday = false;
@@ -1397,8 +1439,6 @@
       return row;
     }
 
-    // Diffs against the DOM instead of wiping/rebuilding innerHTML every
-    // render, so added/removed rows can slide+fade instead of popping.
     function renderHistory() {
       const wrap = document.getElementById('history');
       const todayStart = new Date();
@@ -1446,15 +1486,16 @@
       }
     }
 
-    // Tasks "assigned today" are tasks due today (all-day or at a specific
-    // time); doneOn gives the exact completion timestamp, so the whole
-    // burndown series is rebuilt fresh from a live getTasks() snapshot
-    // rather than tracked incrementally.
     let taskData = { total: 0, completions: [] };
 
     function dateKeyLocal(tsMs) {
       const d = new Date(tsMs);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function dayKeyToMs(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d).getTime();
     }
 
     function isTaskForToday(t, todayStr) {
@@ -1463,14 +1504,14 @@
       return false;
     }
 
-    // All-time task stats used by the "Caffeine impact" section: every
-    // completion (for the level-vs-completion-rate and hour-of-day charts),
-    // per-day tracked time (for the daily tracked-time-vs-caffeine chart),
-    // and estimate/actual pairs (for the estimate-accuracy-vs-level chart).
-    // SP only exposes tracked time as a per-day total (`timeSpentOnDay`), not
-    // with intraday timestamps, so that comparison is day-granularity, not
-    // hour-granularity like the others.
-    let taskHistory = { completions: [], dailyTrackedMs: new Map(), estimateSamples: [] };
+    let taskHistory = {
+      completions: [],
+      dailyTrackedMs: new Map(),
+      estimateSamples: [],
+      creations: [],
+      deadlineDaysMs: [],
+    };
+    let tagsById = new Map();
 
     async function refreshTasks() {
       if (!p.getTasks) return;
@@ -1482,6 +1523,14 @@
       } catch (e) {
         console.error('[Caffeine Tracker] failed to load tasks', e);
         return;
+      }
+      if (p.getAllTags) {
+        try {
+          const tags = await p.getAllTags();
+          tagsById = new Map(tags.map((t) => [t.id, t.title]));
+        } catch (e) {
+          console.error('[Caffeine Tracker] failed to load tags', e);
+        }
       }
 
       const now = Date.now();
@@ -1497,10 +1546,12 @@
       const allCompletions = [];
       const dailyTrackedMs = new Map();
       const estimateSamples = [];
+      const creations = [];
+      const deadlineDaysMs = [];
       for (const t of tasks.concat(archived)) {
         if (seen.has(t.id)) continue;
         seen.add(t.id);
-        if (t.isDone && t.doneOn) allCompletions.push({ time: t.doneOn });
+        if (t.isDone && t.doneOn) allCompletions.push({ time: t.doneOn, tagIds: t.tagIds || [] });
         if (t.timeSpentOnDay) {
           for (const [day, ms] of Object.entries(t.timeSpentOnDay)) {
             dailyTrackedMs.set(day, (dailyTrackedMs.get(day) || 0) + ms);
@@ -1509,36 +1560,22 @@
         if (t.isDone && t.doneOn && t.timeEstimate > 0 && t.timeSpent > 0) {
           estimateSamples.push({ time: t.doneOn, estimate: t.timeEstimate, spent: t.timeSpent });
         }
+        if (t.created) creations.push({ time: t.created });
+        if (t.deadlineDay) deadlineDaysMs.push(dayKeyToMs(t.deadlineDay));
+        else if (t.deadlineWithTime) deadlineDaysMs.push(dayKeyToMs(dateKeyLocal(t.deadlineWithTime)));
       }
       allCompletions.sort((a, b) => a.time - b.time);
-      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples };
+      creations.sort((a, b) => a.time - b.time);
+      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples, creations, deadlineDaysMs };
 
       renderChart();
       renderImpact();
     }
 
-    // SP's iframe PluginAPI only exposes habits (its SimpleCounter feature)
-    // through `getAllCounters()`, a flat { [id]: number } snapshot of each
-    // counter's *today* value — no title, no type (ClickCounter vs.
-    // StopWatch can't be told apart), and no day-by-day history. The richer
-    // per-habit model (title/type/countOnDay) exists in SP's app-side
-    // PluginAPI but plugin-iframe.util.ts never wires it into the iframe
-    // bridge, so it's unreachable from an iFrame-type plugin like this one.
-    // That rules out any historical habit-vs-caffeine report; the only
-    // honest use of this data is a live "habits touched today" count.
-    //
-    // Habits have no doneOn-style completion timestamp either, so the
-    // chart's burndown line is a *session-local* approximation: the first
-    // poll that ever sees a counter's today-value go above zero stamps it
-    // with that poll's wall-clock time. Anything already done before the
-    // plugin was opened today shows as one jump at open-time, not the real
-    // moment it happened. Resets when the calendar day rolls over.
     let habitData = { total: 0, completions: [] };
-    let habitDoneTimes = new Map();
-    let habitDoneDay = null;
 
     async function refreshHabits() {
-      if (!p.getAllCounters) return;
+      if (!p.getAllCounters || !hasLoadedOnce) return;
       let counts;
       try {
         counts = await p.getAllCounters();
@@ -1549,25 +1586,26 @@
 
       const now = Date.now();
       const todayStr = dateKeyLocal(now);
-      if (habitDoneDay !== todayStr) {
-        habitDoneDay = todayStr;
-        habitDoneTimes = new Map();
+      if (!state.habitMarks || state.habitMarks.day !== todayStr) {
+        state.habitMarks = { day: todayStr, marks: {} };
       }
 
       const ids = Object.keys(counts || {});
+      let changed = false;
       for (const id of ids) {
         const done = (counts[id] || 0) > 0;
-        if (done && !habitDoneTimes.has(id)) {
-          habitDoneTimes.set(id, now);
-        } else if (!done && habitDoneTimes.has(id)) {
-          habitDoneTimes.delete(id);
+        if (done && !(id in state.habitMarks.marks)) {
+          state.habitMarks.marks[id] = now;
+          changed = true;
         }
       }
+      if (changed) save();
+
       habitData = {
         total: ids.length,
-        completions: Array.from(habitDoneTimes.values())
-          .map((time) => ({ time }))
-          .sort((a, b) => a.time - b.time),
+        completions: Object.values(state.habitMarks.marks)
+          .sort((a, b) => a - b)
+          .map((time) => ({ time })),
       };
 
       renderChart();
@@ -1584,11 +1622,6 @@
       return bucketMg >= LEVEL_BUCKET_CAP ? `${LEVEL_BUCKET_CAP}+` : `${bucketMg}-${bucketMg + LEVEL_BUCKET_MG}`;
     }
 
-    // Hours spent at each caffeine-level bucket, simulated across all
-    // retained entries at a 30-min resolution. Each step only looks back 48h
-    // of entries (>9 half-lives, so older doses contribute ~0) via a sliding
-    // pointer into time-sorted entries, keeping this roughly O(steps) rather
-    // than O(steps * entries) even at the full 400-day retention window.
     function buildLevelExposureHours() {
       const hours = new Map();
       if (state.entries.length === 0) return hours;
@@ -1609,10 +1642,6 @@
       return hours;
     }
 
-    // Task completions per hour of exposure to each caffeine-level bucket —
-    // a rate, not a raw count, so buckets you're rarely in don't look
-    // artificially quiet. Buckets with under an hour of exposure are dropped
-    // as too noisy to plot.
     function buildCompletionRateByLevel() {
       const exposureHours = buildLevelExposureHours();
       const counts = new Map();
@@ -1631,9 +1660,6 @@
         }));
     }
 
-    // Day-granularity comparison: total mg logged that day vs. total tracked
-    // time that day, for however many of the last `days` calendar days have
-    // either signal.
     function buildDailyTrackedVsCaffeine(days = 30) {
       const now = Date.now();
       const rows = [];
@@ -1651,10 +1677,54 @@
       return rows;
     }
 
-    // Estimate accuracy per caffeine-level bucket: avg % over/under the
-    // planned time-estimate (spent vs. timeEstimate) at the moment each task
-    // was completed. Positive = ran long, negative = finished early. Buckets
-    // with under 2 samples are dropped as too noisy to plot.
+    function buildTaskCreationRateByLevel() {
+      const exposureHours = buildLevelExposureHours();
+      const counts = new Map();
+      for (const c of taskHistory.creations) {
+        const bucket = levelBucketOf(levelAt(c.time));
+        counts.set(bucket, (counts.get(bucket) || 0) + 1);
+      }
+      const buckets = Array.from(new Set([...exposureHours.keys(), ...counts.keys()])).sort((a, b) => a - b);
+      return buckets
+        .filter((b) => (exposureHours.get(b) || 0) >= 1)
+        .map((b) => ({
+          label: levelBucketLabel(b),
+          rate: (counts.get(b) || 0) / exposureHours.get(b),
+          count: counts.get(b) || 0,
+        }));
+    }
+
+    const DEADLINE_PROXIMITY_BUCKETS = [
+      { label: 'Due today', maxDays: 0 },
+      { label: '1-2 days out', maxDays: 2 },
+      { label: '3-7 days out', maxDays: 7 },
+      { label: 'No deadline soon', maxDays: Infinity },
+    ];
+
+    function buildCaffeineByDeadlineProximity() {
+      if (taskHistory.deadlineDaysMs.length === 0) return [];
+      const dayTotals = new Map();
+      for (const e of state.entries) {
+        const key = dateKeyLocal(e.time);
+        dayTotals.set(key, (dayTotals.get(key) || 0) + e.mg);
+      }
+      const buckets = DEADLINE_PROXIMITY_BUCKETS.map((b) => ({ ...b, sumMg: 0, days: 0 }));
+      for (const [dayKey, mg] of dayTotals) {
+        const dayMs = dayKeyToMs(dayKey);
+        let minDiffDays = Infinity;
+        for (const dMs of taskHistory.deadlineDaysMs) {
+          const diffDays = Math.round((dMs - dayMs) / 86400000);
+          if (diffDays >= 0 && diffDays < minDiffDays) minDiffDays = diffDays;
+        }
+        const bucket = buckets.find((b) => minDiffDays <= b.maxDays) || buckets[buckets.length - 1];
+        bucket.sumMg += mg;
+        bucket.days += 1;
+      }
+      return buckets
+        .filter((b) => b.days > 0)
+        .map((b) => ({ label: b.label, avgMg: b.sumMg / b.days, days: b.days }));
+    }
+
     function buildEstimateAccuracyByLevel() {
       const buckets = new Map();
       for (const s of taskHistory.estimateSamples) {
@@ -1674,9 +1744,6 @@
         }));
     }
 
-    // Task completions by hour of day (0-23), independent of caffeine level
-    // — a baseline "when do you actually finish things" pattern to compare
-    // the level-based chart against.
     function buildCompletionsByHour() {
       const counts = new Array(24).fill(0);
       for (const c of taskHistory.completions) counts[new Date(c.time).getHours()] += 1;
@@ -1687,10 +1754,64 @@
       }));
     }
 
-    // Builds a step-line (flat, then a vertical drop at each completion) for
-    // `data.total` remaining, clipped to [startMs, now] since future
-    // completions aren't knowable. Shared by the task burndown and habit
-    // lines — both are shaped as { total, completions: [{ time }] }.
+    function buildTopTagByLevel() {
+      const buckets = new Map(); // bucket -> Map(tagLabel -> count)
+      for (const c of taskHistory.completions) {
+        if (!c.tagIds || c.tagIds.length === 0) continue;
+        const bucket = levelBucketOf(levelAt(c.time));
+        const tagCounts = buckets.get(bucket) || new Map();
+        for (const tagId of c.tagIds) {
+          const label = tagsById.get(tagId) || tagId;
+          tagCounts.set(label, (tagCounts.get(label) || 0) + 1);
+        }
+        buckets.set(bucket, tagCounts);
+      }
+      return Array.from(buckets.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([b, tagCounts]) => {
+          let topLabel = null;
+          let topCount = 0;
+          let total = 0;
+          for (const [label, count] of tagCounts) {
+            total += count;
+            if (count > topCount) {
+              topLabel = label;
+              topCount = count;
+            }
+          }
+          return { label: levelBucketLabel(b), topLabel, topCount, total };
+        });
+    }
+
+    let focusSessionStartMs = null;
+    const focusSessions = []; // { durationMs, level }
+
+    function onCurrentTaskChange() {
+      const now = Date.now();
+      if (focusSessionStartMs !== null) {
+        const durationMs = now - focusSessionStartMs;
+        if (durationMs >= 60000) {
+          focusSessions.push({ durationMs, level: levelAt(focusSessionStartMs) });
+        }
+      }
+      focusSessionStartMs = now;
+      renderImpact();
+    }
+
+    function buildFocusSessionLengthByLevel() {
+      const buckets = new Map(); // bucket -> { sumMin, count }
+      for (const s of focusSessions) {
+        const bucket = levelBucketOf(s.level);
+        const cur = buckets.get(bucket) || { sumMin: 0, count: 0 };
+        cur.sumMin += s.durationMs / 60000;
+        cur.count += 1;
+        buckets.set(bucket, cur);
+      }
+      return Array.from(buckets.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([b, v]) => ({ label: levelBucketLabel(b), avgMin: v.sumMin / v.count, count: v.count }));
+    }
+
     function remainingSeries(data, startMs, endMs) {
       if (!data.total) return null;
       const now = Date.now();
@@ -1754,23 +1875,12 @@
       const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
       const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
       const accent = styles.getPropertyValue('--c-accent').trim() || '#22c55e';
-      const divider = styles.getPropertyValue('--divider-color').trim() || '#ccc';
       const muted = styles.getPropertyValue('--text-color-muted').trim() || '#888';
 
-      // next time the level drops below the sleep threshold, if it falls
-      // within the visible window
       const untilBelow = timeUntilBelow(state.threshold);
       const crossMs = untilBelow !== null && untilBelow > 0 ? now + untilBelow : null;
       const showCrossing = crossMs !== null && crossMs <= endMs;
 
-      // now line
-      ctx.strokeStyle = divider;
-      ctx.beginPath();
-      ctx.moveTo(xOf(now), padT);
-      ctx.lineTo(xOf(now), padT + plotH);
-      ctx.stroke();
-
-      // crossing line: when the level drops under the sleep threshold
       if (showCrossing) {
         ctx.strokeStyle = accent;
         ctx.setLineDash([3, 3]);
@@ -1782,7 +1892,6 @@
         ctx.setLineDash([]);
       }
 
-      // decay curve
       ctx.strokeStyle = primary;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1794,8 +1903,10 @@
       });
       ctx.stroke();
 
-      // fill under curve up to now
-      ctx.fillStyle = primary + '22';
+      const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+      fillGradient.addColorStop(0, toRgba(primary, 0.4));
+      fillGradient.addColorStop(1, toRgba(primary, 0));
+      ctx.fillStyle = fillGradient;
       ctx.beginPath();
       points.forEach(([t, mg], i) => {
         const x = xOf(t);
@@ -1808,7 +1919,6 @@
       ctx.closePath();
       ctx.fill();
 
-      // current point
       ctx.fillStyle = primary;
       ctx.beginPath();
       ctx.arc(xOf(now), yOf(levelAt(now)), 3.5, 0, Math.PI * 2);
@@ -1823,10 +1933,11 @@
       nowLabel.style.left = `${xOf(now)}px`;
       nowLabel.textContent = `Now · ${fmtTime(now)}`;
 
-      // Burndown overlays (tasks, habits): each drawn on its own 0..total
-      // fraction of the plot height, normalized independently so a "3/8
-      // tasks done" line and a "1/2 habits done" line stay visually
-      // comparable despite different totals.
+      const nowLine = document.getElementById('chartNowLine');
+      nowLine.style.left = `${xOf(now)}px`;
+      nowLine.style.top = `${padT}px`;
+      nowLine.style.height = `${plotH}px`;
+
       function drawRemainingLine(data, color, pulseDotId, statElId, doneLabel) {
         const series = remainingSeries(data, startMs, endMs);
         const pulseDot = document.getElementById(pulseDotId);
@@ -1888,7 +1999,6 @@
         ctx.fillText(label, labelX, padT + 10);
       }
 
-      // threshold line: drawn last so it stays visible over the fill/curve
       ctx.strokeStyle = warn;
       ctx.setLineDash([4, 4]);
       ctx.lineWidth = 1;
@@ -1897,15 +2007,14 @@
       ctx.lineTo(w - padR, yOf(state.threshold));
       ctx.stroke();
       ctx.setLineDash([]);
+    }
 
-      // One-time reveal wipe on the first paint of the session: the chart
-      // is drawn fully above, then a mask slides away left-to-right over it.
-      if (!chartRevealed) {
-        chartRevealed = true;
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          document.getElementById('chartRevealMask').classList.add('revealed');
-        }));
-      }
+    function revealChart() {
+      if (chartRevealed) return;
+      chartRevealed = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.getElementById('chartRevealMask').classList.add('revealed');
+      }));
     }
 
     function drawBarChart(canvasId, bars, color) {
@@ -1945,9 +2054,6 @@
       });
     }
 
-    // Two independently-scaled bar series side by side per row (e.g. mg vs.
-    // minutes) — each series is normalized to its own max so they stay
-    // visually comparable in trend despite different units.
     function drawDualBarChart(canvasId, rows, getA, getB, colorA, colorB) {
       const canvas = document.getElementById(canvasId);
       const dpr = window.devicePixelRatio || 1;
@@ -2081,6 +2187,59 @@
           ? 'Not enough data yet — complete some tasks to build this up.'
           : 'Completions by hour of day, all history, independent of caffeine level.';
       drawBarChart('hourHeatmapChart', hourData, '#38bdf8');
+
+      const tagRows = buildTopTagByLevel();
+      const tagNote = document.getElementById('tagByLevelNote');
+      const tagList = document.getElementById('tagByLevelList');
+      tagNote.textContent =
+        tagRows.length === 0
+          ? 'Not enough data yet — needs completed tasks with a tag set.'
+          : 'Most-worked tag by caffeine level.';
+      tagList.innerHTML = '';
+      for (const r of tagRows) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        row.innerHTML = `
+          <span>${r.label} mg <span class="meta">${r.topLabel} · ${r.topCount}/${r.total} completions</span></span>
+        `;
+        tagList.appendChild(row);
+      }
+
+      const focusData = buildFocusSessionLengthByLevel();
+      const focusNote = document.getElementById('focusSessionNote');
+      focusNote.textContent =
+        focusData.length === 0
+          ? 'Not enough data yet (this session only) — switch tasks a few times to build this up.'
+          : 'Avg. focus-session length by caffeine level (this session only).';
+      drawBarChart(
+        'focusSessionChart',
+        focusData.map((r) => ({ label: r.label, value: r.avgMin })),
+        '#a855f7',
+      );
+
+      const creationData = buildTaskCreationRateByLevel();
+      const creationNote = document.getElementById('taskCreationNote');
+      creationNote.textContent =
+        creationData.length === 0
+          ? 'Not enough data yet — log drinks and create tasks to build this up.'
+          : `New tasks created per hour of exposure to each caffeine level (${taskHistory.creations.length} tasks tracked).`;
+      drawBarChart(
+        'taskCreationChart',
+        creationData.map((r) => ({ label: r.label, value: r.rate })),
+        '#ec4899',
+      );
+
+      const deadlineRows = buildCaffeineByDeadlineProximity();
+      const deadlineNote = document.getElementById('deadlineProximityNote');
+      deadlineNote.textContent =
+        deadlineRows.length === 0
+          ? 'Not enough data yet — needs tasks with a deadline set.'
+          : 'Avg. daily mg by how close the nearest deadline was that day.';
+      drawBarChart(
+        'deadlineProximityChart',
+        deadlineRows.map((r) => ({ label: r.label, value: r.avgMg })),
+        '#eab308',
+      );
     }
 
     let summaryPeriod = 'day';
@@ -2126,8 +2285,6 @@
       return key;
     }
 
-    // Days actually elapsed within the period so far, for partial
-    // current-week/current-month averages; capped to the period's length.
     function daysInPeriod(key, period, nowMs = Date.now()) {
       const start = periodStartMs(key, period);
       let end;
@@ -2159,8 +2316,6 @@
       );
     }
 
-    // Ties resolve to whichever label the Map iterated first, ie whichever
-    // was logged first that period - good enough for a "most common" hint.
     function mostCommonDrink(byDrink) {
       let best = null;
       let bestCount = 0;
@@ -2173,8 +2328,6 @@
       return best;
     }
 
-    // Looks up the quick-add emoji for a drink label; drinks can be renamed
-    // or removed later, so this may come up empty for older log entries.
     function drinkEmoji(label) {
       const d = state.drinks.find((x) => x.label === label);
       return d ? d.emoji : '';
@@ -2344,19 +2497,77 @@
         md += '```\n';
       }
 
+      const tagRows = buildTopTagByLevel();
+      if (tagRows.length > 0) {
+        md += `\n## Most-worked tag by caffeine level\n\n`;
+        md += `| Caffeine level (mg) | Top tag | Completions |\n|---|---|---|\n`;
+        for (const r of tagRows) {
+          md += `| ${r.label} | ${escapeMd(r.topLabel)} | ${r.topCount}/${r.total} |\n`;
+        }
+        md += `\n`;
+      }
+
+      const focusRows = buildFocusSessionLengthByLevel();
+      if (focusRows.length > 0) {
+        md += `\n## Focus-session length by caffeine level (this session only)\n\n`;
+        md += `Session-local data — resets on plugin reload, no history across app restarts.\n\n`;
+        md += `| Caffeine level (mg) | Avg. session length (min) | Sessions |\n|---|---|---|\n`;
+        for (const r of focusRows) {
+          md += `| ${r.label} | ${Math.round(r.avgMin)} | ${r.count} |\n`;
+        }
+        md += `\n`;
+        md += '```mermaid\n';
+        md += `xychart-beta\n`;
+        md += `    title "Focus-session length by caffeine level (min, this session only)"\n`;
+        md += `    x-axis [${focusRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
+        md += `    y-axis "min" 0 --> ${Math.round(Math.max(...focusRows.map((r) => r.avgMin)) * 1.15) || 1}\n`;
+        md += `    bar [${focusRows.map((r) => Math.round(r.avgMin)).join(', ')}]\n`;
+        md += '```\n';
+      }
+
+      const creationRows = buildTaskCreationRateByLevel();
+      if (creationRows.length > 0) {
+        md += `\n## Task creation rate by caffeine level\n\n`;
+        md += `New tasks per hour of exposure to each level, from ${taskHistory.creations.length} tracked task creations.\n\n`;
+        md += `| Caffeine level (mg) | New tasks/hour | Tasks created |\n|---|---|---|\n`;
+        for (const r of creationRows) {
+          md += `| ${r.label} | ${r.rate.toFixed(2)} | ${r.count} |\n`;
+        }
+        md += `\n`;
+        md += '```mermaid\n';
+        md += `xychart-beta\n`;
+        md += `    title "New tasks per hour by caffeine level (mg)"\n`;
+        md += `    x-axis [${creationRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
+        md += `    y-axis "tasks/hour" 0 --> ${Math.round(Math.max(...creationRows.map((r) => r.rate)) * 1.15 * 100) / 100 || 1}\n`;
+        md += `    bar [${creationRows.map((r) => r.rate.toFixed(2)).join(', ')}]\n`;
+        md += '```\n';
+      }
+
+      const deadlineRows = buildCaffeineByDeadlineProximity();
+      if (deadlineRows.length > 0) {
+        md += `\n## Caffeine by deadline proximity\n\n`;
+        md += `Avg. daily mg on days with a deadline this close, vs. days with nothing looming.\n\n`;
+        md += `| Deadline proximity | Avg. mg/day | Days |\n|---|---|---|\n`;
+        for (const r of deadlineRows) {
+          md += `| ${r.label} | ${Math.round(r.avgMg)} | ${r.days} |\n`;
+        }
+        md += `\n`;
+        md += '```mermaid\n';
+        md += `xychart-beta\n`;
+        md += `    title "Avg. daily caffeine by deadline proximity (mg)"\n`;
+        md += `    x-axis [${deadlineRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
+        md += `    y-axis "mg" 0 --> ${Math.round(Math.max(...deadlineRows.map((r) => r.avgMg)) * 1.15) || 1}\n`;
+        md += `    bar [${deadlineRows.map((r) => Math.round(r.avgMg)).join(', ')}]\n`;
+        md += '```\n';
+      }
+
       return md;
     }
 
-    // SP's plugin iframe is sandboxed without `allow-downloads`, which
-    // silently swallows anchor-download clicks and Web Share calls with no
-    // console error. The iframe is same-origin with the host, so run both
-    // from window.top's (unsandboxed) window instead, falling back to the
-    // iframe's own window if that's ever blocked (e.g. testing outside SP).
     function getHostWindow() {
       try {
         if (window.top && window.top.document) return window.top;
       } catch (e) {
-        // cross-origin access denied
       }
       return window;
     }
@@ -2367,9 +2578,6 @@
       const win = getHostWindow();
       const blob = new win.Blob([md], { type: 'text/markdown' });
 
-      // Android's System WebView doesn't support navigator.share with files
-      // in every build, so this is a progressive enhancement: use the native
-      // share sheet when it's available, otherwise fall back to a download.
       if (win.navigator.canShare) {
         const file = new win.File([blob], filename, { type: 'text/markdown' });
         if (win.navigator.canShare({ files: [file] })) {
@@ -2378,7 +2586,6 @@
             return;
           } catch (e) {
             if (e && e.name === 'AbortError') return; // user dismissed the share sheet
-            // any other error (e.g. no share target registered): fall through to download
           }
         }
       }
@@ -2494,10 +2701,15 @@
 
     p.registerHook?.(p.Hooks.PERSISTED_DATA_CHANGED, load);
     p.registerHook?.(p.Hooks.ANY_TASK_UPDATE, refreshTasks);
+    p.registerHook?.(p.Hooks.ACTION, (payload) => {
+      if (payload?.action && payload.action.includes('SimpleCounter')) refreshHabits();
+    });
+    p.registerHook?.(p.Hooks.CURRENT_TASK_CHANGE, onCurrentTaskChange);
 
-    p.onReady(() => {
+    p.onReady(async () => {
       renderQuickAdd();
-      load();
+      await load();
+      revealChart();
       updateClock();
       refreshTasks();
       refreshHabits();
