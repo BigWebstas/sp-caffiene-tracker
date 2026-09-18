@@ -18,7 +18,7 @@ caffeine level decay using a half-life model, and its effects on productivity th
 ## Features
 
 - Sleep Streak shows consecutive days you stayed under your sleep threshold
-- Reporting with export to mark down with mermaid charts to show graphing data
+- Reporting with export to mark down includes mermaid charts to show graphing data
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
   soda, pre-workout) plus a custom name/mg entry
 - Live current caffeine level (mg), recomputed from every logged dose using
