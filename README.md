@@ -9,10 +9,11 @@ caffeine level decay using a half-life model, and its effects on productivity th
   <img src="Images/desktop2.png" alt="Desktop view: gauge and quick add" width="49%" />
   <img src="Images/desktop1.png" alt="Desktop view: decay chart, log, and settings" width="49%" />
 </p>
-    <img src="Images/mobile.png" alt="Snow" style="width:32%">
-    <img src="Images/mobile_settings.png" alt="Forest" style="width:32%">
-    <img src="Images/mobile_reports.png" alt="Mountains" style="width:32%">
-
+<p>
+  <img src="Images/mobile.png" alt="Snow" style="width:31%">
+  <img src="Images/mobile_settings.png" alt="Forest" style="width:31%">
+  <img src="Images/mobile_reports.png" alt="Mountains" style="width:31%">
+</p>
 
 ## Features
 
