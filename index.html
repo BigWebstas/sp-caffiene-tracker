@@ -116,6 +116,40 @@
   .level-card {
     text-align: center;
     padding: var(--s3);
+    position: relative;
+  }
+
+  .celebration-burst {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .celebration-particle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 18px;
+    opacity: 0;
+    animation: celebration-fly 1.2s ease-out forwards;
+    animation-delay: var(--delay, 0s);
+  }
+
+  @keyframes celebration-fly {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(var(--angle)) translateX(0) rotate(calc(-1 * var(--angle)));
+    }
+    15% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(var(--angle)) translateX(var(--dist)) rotate(calc(-1 * var(--angle)));
+    }
   }
 
   .level-label {
@@ -142,12 +176,6 @@
     margin-top: var(--s-half);
     color: var(--text-color-muted);
     font-size: 13px;
-  }
-
-  .gauge-timestamp {
-    font-size: 11px;
-    color: var(--text-color-muted);
-    margin-bottom: var(--s-half);
   }
 
   .gauge-canvas {
@@ -184,6 +212,10 @@
 
   .gauge-stat.metabolized .stat-value {
     color: var(--text-color-muted);
+  }
+
+  .gauge-stat.streak .stat-value {
+    color: #22c55e;
   }
 
   .quick-add {
@@ -227,6 +259,11 @@
     min-width: 100px;
   }
 
+  .custom-form #customTime {
+    flex: 0 0 105px;
+    min-width: 105px;
+  }
+
   .chart-wrap {
     padding: var(--s2);
   }
@@ -260,7 +297,8 @@
   }
 
   .chart-tasks-legend:empty,
-  .chart-tasks-legend:has(#chartTasksStat:empty) {
+  .chart-tasks-legend:has(#chartTasksStat:empty),
+  .chart-tasks-legend:has(#chartHabitsStat:empty) {
     display: none;
   }
 
@@ -503,6 +541,34 @@
     position: relative;
   }
 
+  .chart-canvas-wrap {
+    margin-bottom: 16px;
+  }
+
+  .now-time-label {
+    position: absolute;
+    top: 100%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-color-muted);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .chart-reveal-mask {
+    position: absolute;
+    inset: 0;
+    background: var(--card-bg);
+    transform-origin: right;
+    transform: scaleX(1);
+    transition: transform 0.7s ease-out;
+    pointer-events: none;
+  }
+
+  .chart-reveal-mask.revealed {
+    transform: scaleX(0);
+  }
+
   .pulse-dot {
     position: absolute;
     width: 8px;
@@ -568,7 +634,6 @@
   </div>
 
   <div class="card level-card">
-    <div class="gauge-timestamp" id="gaugeTimestamp"></div>
     <div class="gauge-canvas-wrap">
       <canvas id="gauge" class="gauge-canvas"></canvas>
       <div class="pulse-dot" id="gaugePulseDot"></div>
@@ -585,6 +650,10 @@
         <span class="stat-label">Metabolized</span>
         <span class="stat-value" id="metabolizedStat">0 mg</span>
       </div>
+      <div class="gauge-stat streak">
+        <span class="stat-label">Sleep streak</span>
+        <span class="stat-value" id="streakStat">0 days</span>
+      </div>
     </div>
   </div>
 
@@ -595,6 +664,7 @@
   <div class="card custom-form">
     <input type="text" id="customName" placeholder="Drink name" />
     <input type="number" id="customMg" placeholder="mg" min="1" />
+    <input type="number" id="customTime" placeholder="sip min" min="0" max="240" title="Minutes to consume (0 = instant)" />
     <button class="btn-primary" id="customAddBtn">Add</button>
   </div>
 
@@ -604,16 +674,21 @@
       <canvas id="chart"></canvas>
       <div class="pulse-dot" id="chartPulseDot"></div>
       <div class="pulse-dot" id="taskPulseDot"></div>
+      <div class="pulse-dot" id="habitPulseDot"></div>
+      <div class="now-time-label" id="chartNowLabel"></div>
+      <div class="chart-reveal-mask" id="chartRevealMask"></div>
     </div>
     <div class="chart-legend">
       <span id="chartLegendStart">-4h</span>
-      <span id="chartLegendNow">now</span>
       <span id="chartLegendEnd">+18h</span>
     </div>
     <div class="chart-series-legend" id="chartSeriesLegend">
       <span><i class="legend-swatch" style="background: var(--c-primary)"></i>Caffeine (mg)</span>
       <span id="chartTasksLegend" class="chart-tasks-legend">
         <i class="legend-swatch" style="background: #f59e0b"></i><span id="chartTasksStat"></span>
+      </span>
+      <span id="chartHabitsLegend" class="chart-tasks-legend">
+        <i class="legend-swatch" style="background: #22c55e"></i><span id="chartHabitsStat"></span>
       </span>
     </div>
   </div>
@@ -659,6 +734,20 @@
             </div>
             <div class="impact-note" id="dailyTrackedNote">Not enough data yet</div>
           </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Estimate accuracy by caffeine level</div>
+            <canvas id="estimateAccuracyChart" class="impact-canvas"></canvas>
+            <div class="chart-series-legend">
+              <span><i class="legend-swatch" style="background: #f59e0b"></i>Ran long</span>
+              <span><i class="legend-swatch" style="background: #22c55e"></i>Finished early</span>
+            </div>
+            <div class="impact-note" id="estimateAccuracyNote">Not enough data yet</div>
+          </div>
+          <div class="impact-chart-block">
+            <div class="impact-chart-title">Task completions by hour of day</div>
+            <canvas id="hourHeatmapChart" class="impact-canvas"></canvas>
+            <div class="impact-note" id="hourHeatmapNote">Not enough data yet</div>
+          </div>
         </div>
       </div>
     </div>
@@ -697,7 +786,7 @@
             <button type="button" class="emoji-picker-btn" id="newDrinkEmojiBtn">☕</button>
             <input type="text" class="drink-label-input" id="newDrinkLabel" placeholder="Drink name" />
             <input type="number" class="drink-mg-input" id="newDrinkMg" placeholder="mg" min="1" />
-            <input type="number" class="drink-time-input" id="newDrinkTime" placeholder="0" min="0" max="120" title="Minutes to consume (0 = instant)" />
+            <input type="number" class="drink-time-input" id="newDrinkTime" placeholder="0" min="0" max="240" title="Minutes to consume (0 = instant)" />
             <button class="btn-primary drink-action-btn" id="addDrinkBtn">Add</button>
           </div>
         </div>
@@ -816,6 +905,7 @@
       drinks: DEFAULT_DRINKS.map((d) => ({ ...d })),
     };
     let refreshTimer = null;
+    let chartRevealed = false;
 
     // Each entry's mg is treated as consumed at a constant rate over
     // `drinkTimeMin` minutes (0 = instant), with every already-consumed
@@ -910,13 +1000,7 @@
     }
 
     function updateClock() {
-      const now = Date.now();
-      const dateStr = new Date(now).toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
-      document.getElementById('gaugeTimestamp').textContent = `${dateStr} · ${fmtTime(now)}`;
+      document.getElementById('chartNowLabel').textContent = `Now · ${fmtTime(Date.now())}`;
     }
 
     async function load() {
@@ -1057,7 +1141,7 @@
         timeInput.className = 'drink-time-input';
         timeInput.title = 'Minutes to consume (0 = instant)';
         timeInput.min = '0';
-        timeInput.max = '120';
+        timeInput.max = '240';
         timeInput.value = d.drinkTimeMin || 0;
         timeInput.addEventListener('change', (ev) => {
           const val = parseFloat(ev.target.value);
@@ -1204,6 +1288,75 @@
       gaugeAnimFrame = requestAnimationFrame(tick);
     }
 
+    // Consecutive days (today backward) where the level at day's end — "now"
+    // for today, 23:59:59 for past days — stayed under the sleep threshold.
+    // Stops at the first failing day or at the earliest ever logged entry,
+    // so a fresh install doesn't inherit a fake streak from empty history.
+    function computeSleepStreak() {
+      if (state.entries.length === 0) return 0;
+      const earliestDay = new Date(Math.min(...state.entries.map((e) => e.time)));
+      earliestDay.setHours(0, 0, 0, 0);
+      const earliestMs = earliestDay.getTime();
+
+      const now = Date.now();
+      let streak = 0;
+      for (let i = 0; ; i++) {
+        const dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
+        dayStart.setDate(dayStart.getDate() - i);
+        if (dayStart.getTime() < earliestMs) break;
+        const dayEndMs = dayStart.getTime() + 24 * 3600000 - 1000;
+        const level = levelAt(Math.min(dayEndMs, now));
+        if (level >= state.threshold) break;
+        streak++;
+      }
+      return streak;
+    }
+
+    // Session-local celebration: fires once per calendar day, only on a
+    // genuine downward crossing observed during the session (not on an
+    // already-below-threshold first render), matching the same "live poll,
+    // not real history" tradeoff already used for the habit burndown line.
+    let celebrationDay = null;
+    let wasAboveThreshold = false;
+    let hasCelebratedToday = false;
+
+    function maybeCelebrateThreshold(level, now) {
+      const todayStr = dateKeyLocal(now);
+      if (celebrationDay !== todayStr) {
+        celebrationDay = todayStr;
+        hasCelebratedToday = false;
+        wasAboveThreshold = level >= state.threshold;
+      }
+      const isAbove = level >= state.threshold;
+      if (wasAboveThreshold && !isAbove && !hasCelebratedToday && state.entries.length > 0) {
+        hasCelebratedToday = true;
+        fireThresholdCelebration();
+      }
+      wasAboveThreshold = isAbove;
+    }
+
+    function fireThresholdCelebration() {
+      const container = document.querySelector('.level-card');
+      if (!container) return;
+      const burst = document.createElement('div');
+      burst.className = 'celebration-burst';
+      const particles = ['🎉', '✨', '🎊', '⭐', '💤'];
+      const count = 10;
+      for (let i = 0; i < count; i++) {
+        const span = document.createElement('span');
+        span.className = 'celebration-particle';
+        span.textContent = particles[i % particles.length];
+        span.style.setProperty('--angle', `${(i / count) * 360}deg`);
+        span.style.setProperty('--dist', `${60 + Math.random() * 40}px`);
+        span.style.setProperty('--delay', `${Math.random() * 0.15}s`);
+        burst.appendChild(span);
+      }
+      container.appendChild(burst);
+      setTimeout(() => burst.remove(), 1400);
+      p.showSnack?.({ msg: `Under your ${state.threshold} mg threshold 🎉`, type: 'SUCCESS' });
+    }
+
     function renderLevel() {
       const now = Date.now();
       const level = levelAt(now);
@@ -1222,6 +1375,11 @@
             ? `Won't drop below ${state.threshold} mg within 24h`
             : `${fmtDuration(remaining)} until under ${state.threshold} mg`;
       }
+
+      const streak = computeSleepStreak();
+      document.getElementById('streakStat').textContent = `${streak} day${streak === 1 ? '' : 's'}`;
+
+      maybeCelebrateThreshold(level, now);
     }
 
     function buildHistoryRow(e) {
@@ -1306,12 +1464,13 @@
     }
 
     // All-time task stats used by the "Caffeine impact" section: every
-    // completion (for the level-vs-completion-rate chart) and per-day
-    // tracked time (for the daily tracked-time-vs-caffeine chart). SP only
-    // exposes tracked time as a per-day total (`timeSpentOnDay`), not with
-    // intraday timestamps, so that comparison is day-granularity, not
-    // hour-granularity like the completion-rate one.
-    let taskHistory = { completions: [], dailyTrackedMs: new Map() };
+    // completion (for the level-vs-completion-rate and hour-of-day charts),
+    // per-day tracked time (for the daily tracked-time-vs-caffeine chart),
+    // and estimate/actual pairs (for the estimate-accuracy-vs-level chart).
+    // SP only exposes tracked time as a per-day total (`timeSpentOnDay`), not
+    // with intraday timestamps, so that comparison is day-granularity, not
+    // hour-granularity like the others.
+    let taskHistory = { completions: [], dailyTrackedMs: new Map(), estimateSamples: [] };
 
     async function refreshTasks() {
       if (!p.getTasks) return;
@@ -1337,6 +1496,7 @@
       const seen = new Set();
       const allCompletions = [];
       const dailyTrackedMs = new Map();
+      const estimateSamples = [];
       for (const t of tasks.concat(archived)) {
         if (seen.has(t.id)) continue;
         seen.add(t.id);
@@ -1346,12 +1506,71 @@
             dailyTrackedMs.set(day, (dailyTrackedMs.get(day) || 0) + ms);
           }
         }
+        if (t.isDone && t.doneOn && t.timeEstimate > 0 && t.timeSpent > 0) {
+          estimateSamples.push({ time: t.doneOn, estimate: t.timeEstimate, spent: t.timeSpent });
+        }
       }
       allCompletions.sort((a, b) => a.time - b.time);
-      taskHistory = { completions: allCompletions, dailyTrackedMs };
+      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples };
 
       renderChart();
       renderImpact();
+    }
+
+    // SP's iframe PluginAPI only exposes habits (its SimpleCounter feature)
+    // through `getAllCounters()`, a flat { [id]: number } snapshot of each
+    // counter's *today* value — no title, no type (ClickCounter vs.
+    // StopWatch can't be told apart), and no day-by-day history. The richer
+    // per-habit model (title/type/countOnDay) exists in SP's app-side
+    // PluginAPI but plugin-iframe.util.ts never wires it into the iframe
+    // bridge, so it's unreachable from an iFrame-type plugin like this one.
+    // That rules out any historical habit-vs-caffeine report; the only
+    // honest use of this data is a live "habits touched today" count.
+    //
+    // Habits have no doneOn-style completion timestamp either, so the
+    // chart's burndown line is a *session-local* approximation: the first
+    // poll that ever sees a counter's today-value go above zero stamps it
+    // with that poll's wall-clock time. Anything already done before the
+    // plugin was opened today shows as one jump at open-time, not the real
+    // moment it happened. Resets when the calendar day rolls over.
+    let habitData = { total: 0, completions: [] };
+    let habitDoneTimes = new Map();
+    let habitDoneDay = null;
+
+    async function refreshHabits() {
+      if (!p.getAllCounters) return;
+      let counts;
+      try {
+        counts = await p.getAllCounters();
+      } catch (e) {
+        console.error('[Caffeine Tracker] failed to load habits', e);
+        return;
+      }
+
+      const now = Date.now();
+      const todayStr = dateKeyLocal(now);
+      if (habitDoneDay !== todayStr) {
+        habitDoneDay = todayStr;
+        habitDoneTimes = new Map();
+      }
+
+      const ids = Object.keys(counts || {});
+      for (const id of ids) {
+        const done = (counts[id] || 0) > 0;
+        if (done && !habitDoneTimes.has(id)) {
+          habitDoneTimes.set(id, now);
+        } else if (!done && habitDoneTimes.has(id)) {
+          habitDoneTimes.delete(id);
+        }
+      }
+      habitData = {
+        total: ids.length,
+        completions: Array.from(habitDoneTimes.values())
+          .map((time) => ({ time }))
+          .sort((a, b) => a.time - b.time),
+      };
+
+      renderChart();
     }
 
     const LEVEL_BUCKET_MG = 50;
@@ -1432,20 +1651,57 @@
       return rows;
     }
 
+    // Estimate accuracy per caffeine-level bucket: avg % over/under the
+    // planned time-estimate (spent vs. timeEstimate) at the moment each task
+    // was completed. Positive = ran long, negative = finished early. Buckets
+    // with under 2 samples are dropped as too noisy to plot.
+    function buildEstimateAccuracyByLevel() {
+      const buckets = new Map();
+      for (const s of taskHistory.estimateSamples) {
+        const bucket = levelBucketOf(levelAt(s.time));
+        const cur = buckets.get(bucket) || { sumPctError: 0, count: 0 };
+        cur.sumPctError += ((s.spent - s.estimate) / s.estimate) * 100;
+        cur.count += 1;
+        buckets.set(bucket, cur);
+      }
+      return Array.from(buckets.entries())
+        .filter(([, v]) => v.count >= 2)
+        .sort((a, b) => a[0] - b[0])
+        .map(([b, v]) => ({
+          label: levelBucketLabel(b),
+          avgPctError: v.sumPctError / v.count,
+          count: v.count,
+        }));
+    }
+
+    // Task completions by hour of day (0-23), independent of caffeine level
+    // — a baseline "when do you actually finish things" pattern to compare
+    // the level-based chart against.
+    function buildCompletionsByHour() {
+      const counts = new Array(24).fill(0);
+      for (const c of taskHistory.completions) counts[new Date(c.time).getHours()] += 1;
+      const labelHours = new Set([0, 6, 12, 18]);
+      return counts.map((count, hour) => ({
+        label: labelHours.has(hour) ? `${hour}h` : '',
+        value: count,
+      }));
+    }
+
     // Builds a step-line (flat, then a vertical drop at each completion) for
-    // tasks remaining, clipped to [startMs, now] since future completions
-    // aren't knowable.
-    function taskRemainingSeries(startMs, endMs) {
-      if (!taskData.total) return null;
+    // `data.total` remaining, clipped to [startMs, now] since future
+    // completions aren't knowable. Shared by the task burndown and habit
+    // lines — both are shaped as { total, completions: [{ time }] }.
+    function remainingSeries(data, startMs, endMs) {
+      if (!data.total) return null;
       const now = Date.now();
       const clampedEnd = Math.min(now, endMs);
       if (clampedEnd <= startMs) return null;
 
-      const preCount = taskData.completions.filter((c) => c.time <= startMs).length;
-      let remaining = taskData.total - preCount;
+      const preCount = data.completions.filter((c) => c.time <= startMs).length;
+      let remaining = data.total - preCount;
 
       const points = [[startMs, remaining]];
-      for (const c of taskData.completions) {
+      for (const c of data.completions) {
         if (c.time <= startMs || c.time > clampedEnd) continue;
         points.push([c.time, remaining]);
         remaining -= 1;
@@ -1473,7 +1729,6 @@
       const stepMs = 15 * 60000;
 
       document.getElementById('chartLegendStart').textContent = fmtChartLabel(startMs, now);
-      document.getElementById('chartLegendNow').textContent = `Now · ${fmtTime(now)}`;
       document.getElementById('chartLegendEnd').textContent = fmtChartLabel(endMs, now);
 
       const points = [];
@@ -1507,16 +1762,6 @@
       const untilBelow = timeUntilBelow(state.threshold);
       const crossMs = untilBelow !== null && untilBelow > 0 ? now + untilBelow : null;
       const showCrossing = crossMs !== null && crossMs <= endMs;
-
-      // threshold line
-      ctx.strokeStyle = warn;
-      ctx.setLineDash([4, 4]);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(padL, yOf(state.threshold));
-      ctx.lineTo(w - padR, yOf(state.threshold));
-      ctx.stroke();
-      ctx.setLineDash([]);
 
       // now line
       ctx.strokeStyle = divider;
@@ -1574,46 +1819,55 @@
       pulseDot.style.top = `${yOf(levelAt(now))}px`;
       pulseDot.classList.add('active');
 
-      // task burndown overlay: independent 0..total y-scale, drawn over the
-      // caffeine curve's time axis
-      const taskColor = '#f59e0b';
-      const taskSeries = taskRemainingSeries(startMs, endMs);
-      const tasksStatEl = document.getElementById('chartTasksStat');
-      if (taskSeries) {
-        const maxTasks = Math.max(taskData.total, 1);
-        const yOfTasks = (n) => padT + plotH - (n / maxTasks) * plotH;
+      const nowLabel = document.getElementById('chartNowLabel');
+      nowLabel.style.left = `${xOf(now)}px`;
+      nowLabel.textContent = `Now · ${fmtTime(now)}`;
 
-        ctx.strokeStyle = taskColor;
+      // Burndown overlays (tasks, habits): each drawn on its own 0..total
+      // fraction of the plot height, normalized independently so a "3/8
+      // tasks done" line and a "1/2 habits done" line stay visually
+      // comparable despite different totals.
+      function drawRemainingLine(data, color, pulseDotId, statElId, doneLabel) {
+        const series = remainingSeries(data, startMs, endMs);
+        const pulseDot = document.getElementById(pulseDotId);
+        const statEl = document.getElementById(statElId);
+        if (!series) {
+          pulseDot.classList.remove('active');
+          statEl.textContent = '';
+          return;
+        }
+        const yOfFrac = (n) => padT + plotH - (n / Math.max(data.total, 1)) * plotH;
+
+        ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.setLineDash([2, 2]);
         ctx.beginPath();
-        taskSeries.forEach(([t, n], i) => {
+        series.forEach(([t, n], i) => {
           const x = xOf(t);
-          const y = yOfTasks(n);
+          const y = yOfFrac(n);
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         });
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const [lastT, lastN] = taskSeries[taskSeries.length - 1];
-        ctx.fillStyle = taskColor;
+        const [lastT, lastN] = series[series.length - 1];
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(xOf(lastT), yOfTasks(lastN), 3, 0, Math.PI * 2);
+        ctx.arc(xOf(lastT), yOfFrac(lastN), 3, 0, Math.PI * 2);
         ctx.fill();
 
-        const taskPulseDot = document.getElementById('taskPulseDot');
-        taskPulseDot.style.left = `${xOf(lastT)}px`;
-        taskPulseDot.style.top = `${yOfTasks(lastN)}px`;
-        taskPulseDot.style.setProperty('--pulse-color', taskColor);
-        taskPulseDot.classList.add('active');
+        pulseDot.style.left = `${xOf(lastT)}px`;
+        pulseDot.style.top = `${yOfFrac(lastN)}px`;
+        pulseDot.style.setProperty('--pulse-color', color);
+        pulseDot.classList.add('active');
 
-        const done = taskData.total - lastN;
-        tasksStatEl.textContent = `${done}/${taskData.total} tasks done today`;
-      } else {
-        document.getElementById('taskPulseDot').classList.remove('active');
-        tasksStatEl.textContent = '';
+        const done = data.total - lastN;
+        statEl.textContent = `${done}/${data.total} ${doneLabel}`;
       }
+
+      drawRemainingLine(taskData, '#f59e0b', 'taskPulseDot', 'chartTasksStat', 'tasks done today');
+      drawRemainingLine(habitData, '#22c55e', 'habitPulseDot', 'chartHabitsStat', 'habits done today');
 
       if (showCrossing) {
         const crossX = xOf(crossMs);
@@ -1632,6 +1886,25 @@
         ctx.textAlign = nearRightEdge ? 'right' : nearLeftEdge ? 'left' : 'center';
         const labelX = nearRightEdge ? w - padR : nearLeftEdge ? padL : crossX;
         ctx.fillText(label, labelX, padT + 10);
+      }
+
+      // threshold line: drawn last so it stays visible over the fill/curve
+      ctx.strokeStyle = warn;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, yOf(state.threshold));
+      ctx.lineTo(w - padR, yOf(state.threshold));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // One-time reveal wipe on the first paint of the session: the chart
+      // is drawn fully above, then a mask slides away left-to-right over it.
+      if (!chartRevealed) {
+        chartRevealed = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          document.getElementById('chartRevealMask').classList.add('revealed');
+        }));
       }
     }
 
@@ -1672,7 +1945,10 @@
       });
     }
 
-    function drawDualBarChart(canvasId, rows) {
+    // Two independently-scaled bar series side by side per row (e.g. mg vs.
+    // minutes) — each series is normalized to its own max so they stay
+    // visually comparable in trend despite different units.
+    function drawDualBarChart(canvasId, rows, getA, getB, colorA, colorB) {
       const canvas = document.getElementById(canvasId);
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
@@ -1691,20 +1967,68 @@
       const padB = 2;
       const plotW = w - padL - padR;
       const plotH = h - padT - padB;
-      const maxMg = Math.max(...rows.map((r) => r.mg), 1);
-      const maxMin = Math.max(...rows.map((r) => r.trackedMin), 1);
+      const maxA = Math.max(...rows.map(getA), 1);
+      const maxB = Math.max(...rows.map(getB), 1);
       const groupGap = 3;
       const groupW = Math.max((plotW - groupGap * (rows.length - 1)) / rows.length, 3);
       const barW = Math.max(groupW / 2 - 1, 1);
 
       rows.forEach((r, i) => {
         const gx = padL + i * (groupW + groupGap);
-        const mgH = (r.mg / maxMg) * plotH;
-        const minH = (r.trackedMin / maxMin) * plotH;
-        ctx.fillStyle = '#7c4dff';
-        ctx.fillRect(gx, padT + plotH - mgH, barW, mgH);
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(gx + barW + 1, padT + plotH - minH, barW, minH);
+        const aH = (getA(r) / maxA) * plotH;
+        const bH = (getB(r) / maxB) * plotH;
+        ctx.fillStyle = colorA;
+        ctx.fillRect(gx, padT + plotH - aH, barW, aH);
+        ctx.fillStyle = colorB;
+        ctx.fillRect(gx + barW + 1, padT + plotH - bH, barW, bH);
+      });
+    }
+
+    function drawSignedBarChart(canvasId, bars, posColor, negColor) {
+      const canvas = document.getElementById(canvasId);
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(rect.width, 200);
+      const h = 110;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      if (bars.length === 0) return;
+
+      const padL = 2;
+      const padR = 2;
+      const padT = 8;
+      const padB = 14;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+      const maxAbs = Math.max(...bars.map((b) => Math.abs(b.value)), 1);
+      const zeroY = padT + plotH / 2;
+      const gap = 4;
+      const barW = Math.max((plotW - gap * (bars.length - 1)) / bars.length, 2);
+
+      const styles = getComputedStyle(document.documentElement);
+      const muted = styles.getPropertyValue('--text-color-muted').trim() || '#888';
+      const divider = styles.getPropertyValue('--divider-color').trim() || '#ccc';
+
+      ctx.strokeStyle = divider;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, zeroY);
+      ctx.lineTo(w - padR, zeroY);
+      ctx.stroke();
+
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+
+      bars.forEach((b, i) => {
+        const x = padL + i * (barW + gap);
+        const barH = (Math.abs(b.value) / maxAbs) * (plotH / 2);
+        ctx.fillStyle = b.value >= 0 ? posColor : negColor;
+        ctx.fillRect(x, b.value >= 0 ? zeroY - barH : zeroY, barW, barH);
+        ctx.fillStyle = muted;
+        ctx.fillText(b.label, x + barW / 2, h - 3);
       });
     }
 
@@ -1727,7 +2051,36 @@
         trackedRows.length === 0
           ? 'Not enough data yet — needs days with both logged caffeine and tracked time.'
           : `Last ${trackedRows.length} day${trackedRows.length === 1 ? '' : 's'} with data, oldest to newest.`;
-      drawDualBarChart('dailyTrackedChart', trackedRows);
+      drawDualBarChart(
+        'dailyTrackedChart',
+        trackedRows,
+        (r) => r.mg,
+        (r) => r.trackedMin,
+        '#7c4dff',
+        '#22c55e',
+      );
+
+      const accuracyData = buildEstimateAccuracyByLevel();
+      const accuracyNote = document.getElementById('estimateAccuracyNote');
+      accuracyNote.textContent =
+        accuracyData.length === 0
+          ? 'Not enough data yet — needs tasks with a time estimate set.'
+          : 'Avg. % over (amber) or under (green) your time estimate, by caffeine level.';
+      drawSignedBarChart(
+        'estimateAccuracyChart',
+        accuracyData.map((r) => ({ label: r.label, value: r.avgPctError })),
+        '#f59e0b',
+        '#22c55e',
+      );
+
+      const hourData = buildCompletionsByHour();
+      const hourNote = document.getElementById('hourHeatmapNote');
+      const hourTotal = hourData.reduce((s, b) => s + b.value, 0);
+      hourNote.textContent =
+        hourTotal === 0
+          ? 'Not enough data yet — complete some tasks to build this up.'
+          : 'Completions by hour of day, all history, independent of caffeine level.';
+      drawBarChart('hourHeatmapChart', hourData, '#38bdf8');
     }
 
     let summaryPeriod = 'day';
@@ -1954,6 +2307,43 @@
         md += '```\n';
       }
 
+      const accuracyData = buildEstimateAccuracyByLevel();
+      if (accuracyData.length > 0) {
+        md += `\n## Estimate accuracy by caffeine level\n\n`;
+        md += `Positive = ran long past the time estimate, negative = finished early.\n\n`;
+        md += `| Caffeine level (mg) | Avg % over/under estimate | Tasks |\n|---|---|---|\n`;
+        for (const r of accuracyData) {
+          md += `| ${r.label} | ${r.avgPctError.toFixed(1)}% | ${r.count} |\n`;
+        }
+        md += `\n`;
+        const maxAbs = Math.max(...accuracyData.map((r) => Math.abs(r.avgPctError)), 1) * 1.15;
+        md += '```mermaid\n';
+        md += `xychart-beta\n`;
+        md += `    title "Estimate accuracy by caffeine level (% over/under)"\n`;
+        md += `    x-axis [${accuracyData.map((r) => `"${r.label}"`).join(', ')}]\n`;
+        md += `    y-axis "% over/under" ${Math.round(-maxAbs)} --> ${Math.round(maxAbs)}\n`;
+        md += `    bar [${accuracyData.map((r) => r.avgPctError.toFixed(1)).join(', ')}]\n`;
+        md += '```\n';
+      }
+
+      const hourData = buildCompletionsByHour().map((b, hour) => ({ label: `${hour}h`, value: b.value }));
+      const hourTotal = hourData.reduce((s, b) => s + b.value, 0);
+      if (hourTotal > 0) {
+        md += `\n## Task completions by hour of day\n\n`;
+        md += `| Hour | Completions |\n|---|---|\n`;
+        for (const b of hourData) {
+          if (b.value > 0) md += `| ${b.label} | ${b.value} |\n`;
+        }
+        md += `\n`;
+        md += '```mermaid\n';
+        md += `xychart-beta\n`;
+        md += `    title "Task completions by hour of day"\n`;
+        md += `    x-axis [${hourData.map((b) => `"${b.label}"`).join(', ')}]\n`;
+        md += `    y-axis "completions" 0 --> ${Math.round(Math.max(...hourData.map((b) => b.value)) * 1.15) || 1}\n`;
+        md += `    bar [${hourData.map((b) => b.value).join(', ')}]\n`;
+        md += '```\n';
+      }
+
       return md;
     }
 
@@ -2021,15 +2411,18 @@
     document.getElementById('customAddBtn').addEventListener('click', () => {
       const nameEl = document.getElementById('customName');
       const mgEl = document.getElementById('customMg');
+      const timeEl = document.getElementById('customTime');
       const name = nameEl.value.trim() || 'Custom';
       const mg = parseFloat(mgEl.value);
+      const drinkTimeMin = Math.max(parseFloat(timeEl.value) || 0, 0);
       if (!mg || mg <= 0) {
         p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
         return;
       }
-      addEntry(name, mg);
+      addEntry(name, mg, drinkTimeMin);
       nameEl.value = '';
       mgEl.value = '';
+      timeEl.value = '';
     });
 
     document.getElementById('halfLifeInput').addEventListener('change', (ev) => {
@@ -2107,7 +2500,9 @@
       load();
       updateClock();
       refreshTasks();
+      refreshHabits();
       refreshTimer = setInterval(renderAll, 5000);
+      setInterval(refreshHabits, 30000);
       setInterval(refreshTasks, 30000);
       setInterval(updateClock, 1000);
     });
