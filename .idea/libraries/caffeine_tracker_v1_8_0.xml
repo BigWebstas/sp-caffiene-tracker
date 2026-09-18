@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="caffeine-tracker-v1.8.0">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/dist/caffeine-tracker-v1.8.0.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

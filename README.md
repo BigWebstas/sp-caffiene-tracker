@@ -3,6 +3,14 @@
 A Super Productivity plugin that logs caffeine intake and simulates blood
 caffeine level decay using a half-life model.
 
+## Screenshots
+
+<p>
+  <img src="Images/desktop2.png" alt="Desktop view: gauge and quick add" width="49%" />
+  <img src="Images/desktop1.png" alt="Desktop view: decay chart, log, and settings" width="49%" />
+</p>
+<img src="Images/mobile.png" alt="Mobile view" width="300" />
+
 ## Features
 
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
