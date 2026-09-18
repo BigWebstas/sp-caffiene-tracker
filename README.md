@@ -10,8 +10,8 @@ caffeine level decay using a half-life model.
   <img src="Images/desktop1.png" alt="Desktop view: decay chart, log, and settings" width="49%" />
 </p>
 <img src="Images/mobile.png" alt="Mobile view" width="300" />
-<img src="Images/mobile_settings" alt="Mobile view" width="300" />
-<img src="Images/mobile_reports/" alt="Mobile view" width="300" />
+<img src="Images/mobile_settings.png" alt="Mobile view" width="300" />
+<img src="Images/mobile_reports.png" alt="Mobile view" width="300" />
 ## Features
 
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
