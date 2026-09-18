@@ -17,12 +17,13 @@ caffeine level decay using a half-life model, and its effects on productivity th
 
 ## Features
 
+- Sleep Streak shows consecutive days you stayed under your sleep threshold
+- Reporting with export to mark down with mermaid charts to show graphing data
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
   soda, pre-workout) plus a custom name/mg entry
 - Live current caffeine level (mg), recomputed from every logged dose using
   `mg * 0.5^(hoursElapsed / halfLife)`
-- Decay curve chart (past 4h to next 18h) with a configurable "sleep
-  threshold" line and a countdown to when your level drops below it
+- Decay curve chart (past 4h to next 18h) with task burn down and habit tracking vs caffeine in your system
 - Adjustable half-life (default 5h, the commonly cited average) and
   threshold (default 50mg)
 - Today's log with per-entry removal
