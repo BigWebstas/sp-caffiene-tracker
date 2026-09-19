@@ -53,6 +53,25 @@
     border-radius: var(--card-border-radius);
   }
 
+  .hidden {
+    display: none !important;
+  }
+
+  .update-btn {
+    border-color: #f59e0b !important;
+    color: #f59e0b !important;
+    animation: update-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes update-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
   .modal-overlay {
     display: flex;
     justify-content: center;
@@ -660,6 +679,7 @@
   <div class="header-row">
     <h1>☕ Caffeine Tracker</h1>
     <div class="header-actions">
+      <button type="button" class="icon-btn update-btn hidden" id="updateBtn" title="A newer version is available" aria-label="Update available">🔔 Update</button>
       <button type="button" class="icon-btn" id="reportsBtn" title="Reports" aria-label="Reports">📊 Reports</button>
       <button type="button" class="icon-btn" id="settingsBtn" title="Settings &amp; drinks" aria-label="Settings">⚙️ Settings</button>
     </div>
@@ -854,6 +874,40 @@
   <script>
     const p = PluginAPI;
 
+    // Keep in sync with manifest.json's "version" on every release — this
+    // is what the update check compares against the latest GitHub tag.
+    const CURRENT_VERSION = '1.30.0';
+    const REPO = 'BigWebstas/sp-caffiene-tracker';
+
+    // Dotted numeric version compare (handles unequal segment counts, e.g.
+    // "1.29" vs "1.29.0", by treating a missing segment as 0).
+    function isNewerVersion(a, b) {
+      const pa = a.split('.').map(Number);
+      const pb = b.split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = pa[i] || 0;
+        const nb = pb[i] || 0;
+        if (na !== nb) return na > nb;
+      }
+      return false;
+    }
+
+    async function checkForUpdate() {
+      if (!p.request) return;
+      try {
+        const release = await p.request(`https://api.github.com/repos/${REPO}/releases/latest`);
+        const latestVersion = (release?.tag_name || '').replace(/^v/, '');
+        if (latestVersion && isNewerVersion(latestVersion, CURRENT_VERSION)) {
+          const btn = document.getElementById('updateBtn');
+          btn.classList.remove('hidden');
+          btn.dataset.version = latestVersion;
+          btn.dataset.url = release.html_url || `https://github.com/${REPO}/releases/latest`;
+        }
+      } catch (e) {
+        console.error('[Caffeine Tracker] update check failed', e);
+      }
+    }
+
     const DEFAULT_DRINKS = [
       { id: 'coffee', label: 'Coffee', emoji: '☕', mg: 95, drinkTimeMin: 15 },
       { id: 'espresso', label: 'Espresso', emoji: '⚡', mg: 63, drinkTimeMin: 2 },
@@ -937,6 +991,17 @@
     function closeReports() {
       document.getElementById('reportsOverlay').classList.remove('open');
     }
+
+    document.getElementById('updateBtn').addEventListener('click', (ev) => {
+      const url = ev.currentTarget.dataset.url;
+      const version = ev.currentTarget.dataset.version;
+      try {
+        getHostWindow().open(url, '_blank');
+      } catch (e) {
+        console.error('[Caffeine Tracker] failed to open release page', e);
+      }
+      p.showSnack?.({ msg: `Update available: v${version}`, type: 'SUCCESS' });
+    });
 
     document.getElementById('settingsBtn').addEventListener('click', openSettings);
     document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
@@ -2789,6 +2854,7 @@
       updateClock();
       refreshTasks();
       refreshHabits();
+      checkForUpdate();
       setInterval(renderAll, 5000);
       setInterval(refreshHabits, 30000);
       setInterval(refreshTasks, 30000);

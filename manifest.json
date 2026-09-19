@@ -1,7 +1,7 @@
 {
   "id": "caffeine-tracker",
   "name": "Caffeine Tracker",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "description": "Log caffeine intake and simulate blood caffeine level decay over time using a half-life model",
   "manifestVersion": 1,
   "minSupVersion": "14.0.0",
@@ -19,7 +19,9 @@
     "getTasks",
     "getArchivedTasks",
     "getAllCounters",
-    "getAllTags"
+    "getAllTags",
+    "http"
   ],
+  "allowedHosts": ["api.github.com"],
   "hooks": ["persistedDataChanged", "anyTaskUpdate", "action", "currentTaskChange"]
 }

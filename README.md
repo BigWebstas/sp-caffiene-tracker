@@ -33,6 +33,8 @@ caffeine level decay using a half-life model, and its effects on productivity th
 - Today's log with per-entry removal
 - Data synced via `persistDataSynced` / `loadSyncedData`, so history follows
   you across devices
+- Update check on open: a 🔔 button appears next to Reports when a newer
+  GitHub release exists, linking straight to it
 
 ## Install
 
@@ -49,6 +51,11 @@ caffeine level decay using a half-life model, and its effects on productivity th
 - Entries older than 7 days are pruned automatically on load; the decay
   simulation only needs recent doses since older ones contribute a
   negligible amount at a 5h half-life.
+- **Network access:** the only outbound call this plugin makes is a single
+  read-only `GET` to `api.github.com/repos/BigWebstas/sp-caffiene-tracker/releases/latest`
+  once per open, to check for a newer version. Nothing is sent besides the
+  request itself — no telemetry, no data upload. This is what the `http`
+  permission and `allowedHosts` entry in `manifest.json` are for.
 - **Session-only data:** Super Productivity's plugin API doesn't expose *when*
   a habit was checked off or *when* you last switched tasks, only "what's
   true right now" for habits, or a live change event for the current task.
