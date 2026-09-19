@@ -318,9 +318,7 @@
     gap: 4px;
   }
 
-  .chart-tasks-legend:empty,
-  .chart-tasks-legend:has(#chartTasksStat:empty),
-  .chart-tasks-legend:has(#chartHabitsStat:empty) {
+  .chart-tasks-legend:has(span:empty) {
     display: none;
   }
 
@@ -459,7 +457,10 @@
 
   .emoji-popover {
     position: fixed;
-    z-index: 1000;
+    /* Must sit above .modal-overlay's z-index: 2000, since it's opened
+       from the drink emoji picker inside the Settings modal — at 1000 it
+       rendered underneath the modal, out of click range. */
+    z-index: 2100;
     background: var(--card-bg);
     border: 1px solid var(--divider-color);
     border-radius: var(--card-border-radius);
@@ -963,9 +964,7 @@
       drinks: DEFAULT_DRINKS.map((d) => ({ ...d })),
       habitMarks: { day: null, marks: {} },
     };
-    let refreshTimer = null;
     let hasLoadedOnce = false;
-    let chartRevealed = false;
 
     function entryLevelAt(e, tsMs) {
       const H = state.halfLifeHours * 3600000;
@@ -1077,6 +1076,11 @@
     }
 
     async function save() {
+      // Guards every call site at the one place that matters, not just the
+      // one that caused the historical data-loss incident: saving before
+      // load() has merged persisted data would overwrite it with the
+      // still-default state (empty entries, default drinks, etc).
+      if (!hasLoadedOnce) return;
       try {
         await p.persistDataSynced(JSON.stringify(state));
       } catch (e) {
@@ -1094,6 +1098,26 @@
     function flashDataCards() {
       flashCard(document.querySelector('.level-card'));
       flashCard(document.querySelector('.chart-wrap'));
+    }
+
+    function validateMg(mg) {
+      if (mg > 0) return true;
+      p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
+      return false;
+    }
+
+    // Binds a settings <input type="number"> to a state field: on change,
+    // only accepts values within [min, max], persists, and re-renders.
+    function bindNumberSetting(inputId, stateField, min, max) {
+      document.getElementById(inputId).addEventListener('change', (ev) => {
+        const val = parseFloat(ev.target.value);
+        if (val >= min && val <= max) {
+          state[stateField] = val;
+          save();
+          renderAll();
+          flashDataCards();
+        }
+      });
     }
 
     function addEntry(label, mg, drinkTimeMin = 0) {
@@ -1123,7 +1147,21 @@
       for (const d of state.drinks) {
         const btn = document.createElement('button');
         btn.className = d.mg < 80 ? 'tier-light' : d.mg <= 150 ? 'tier-medium' : 'tier-heavy';
-        btn.innerHTML = `<span class="drink-emoji">${d.emoji}</span><span>${d.label}</span><span class="drink-mg">${d.mg} mg</span>`;
+
+        // Built with createElement/textContent, not innerHTML: d.label and
+        // d.emoji come from synced state (persistDataSynced can deliver a
+        // payload that was never typed on this device), so interpolating
+        // them into innerHTML would let a malicious drink name execute.
+        const emojiSpan = document.createElement('span');
+        emojiSpan.className = 'drink-emoji';
+        emojiSpan.textContent = d.emoji;
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = d.label;
+        const mgSpan = document.createElement('span');
+        mgSpan.className = 'drink-mg';
+        mgSpan.textContent = `${d.mg} mg`;
+        btn.append(emojiSpan, labelSpan, mgSpan);
+
         btn.addEventListener('click', () => addEntry(d.label, d.mg, d.drinkTimeMin || 0));
         wrap.appendChild(btn);
       }
@@ -1429,9 +1467,18 @@
       row.className = 'history-row';
       row.dataset.id = e.id;
       const rampNote = e.drinkTimeMin > 0 ? ` · sipped over ${e.drinkTimeMin}m` : '';
-      row.innerHTML = `
-        <span>${e.label} <span class="meta">${e.mg} mg · ${fmtTime(e.time)}${rampNote}</span></span>
-      `;
+
+      // createElement/textContent, not innerHTML — e.label is synced state
+      // and can arrive via PERSISTED_DATA_CHANGED without ever being typed
+      // on this device, so it must not be interpolated into markup.
+      const main = document.createElement('span');
+      main.textContent = `${e.label} `;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = `${e.mg} mg · ${fmtTime(e.time)}${rampNote}`;
+      main.appendChild(meta);
+      row.appendChild(main);
+
       const delBtn = document.createElement('button');
       delBtn.textContent = 'Remove';
       delBtn.addEventListener('click', () => deleteEntry(e.id));
@@ -1515,22 +1562,25 @@
 
     async function refreshTasks() {
       if (!p.getTasks) return;
-      let tasks;
-      let archived;
-      try {
-        tasks = await p.getTasks();
-        archived = p.getArchivedTasks ? await p.getArchivedTasks() : [];
-      } catch (e) {
-        console.error('[Caffeine Tracker] failed to load tasks', e);
+      // These three host calls don't depend on each other, so fetch them
+      // concurrently instead of one after another.
+      const [tasksResult, archivedResult, tagsResult] = await Promise.allSettled([
+        p.getTasks(),
+        p.getArchivedTasks ? p.getArchivedTasks() : Promise.resolve([]),
+        p.getAllTags ? p.getAllTags() : Promise.resolve(null),
+      ]);
+
+      if (tasksResult.status === 'rejected' || archivedResult.status === 'rejected') {
+        console.error('[Caffeine Tracker] failed to load tasks', tasksResult.reason || archivedResult.reason);
         return;
       }
-      if (p.getAllTags) {
-        try {
-          const tags = await p.getAllTags();
-          tagsById = new Map(tags.map((t) => [t.id, t.title]));
-        } catch (e) {
-          console.error('[Caffeine Tracker] failed to load tags', e);
-        }
+      const tasks = tasksResult.value;
+      const archived = archivedResult.value;
+
+      if (tagsResult.status === 'fulfilled' && tagsResult.value) {
+        tagsById = new Map(tagsResult.value.map((t) => [t.id, t.title]));
+      } else if (tagsResult.status === 'rejected') {
+        console.error('[Caffeine Tracker] failed to load tags', tagsResult.reason);
       }
 
       const now = Date.now();
@@ -1642,8 +1692,7 @@
       return hours;
     }
 
-    function buildCompletionRateByLevel() {
-      const exposureHours = buildLevelExposureHours();
+    function buildCompletionRateByLevel(exposureHours = buildLevelExposureHours()) {
       const counts = new Map();
       for (const c of taskHistory.completions) {
         const bucket = levelBucketOf(levelAt(c.time));
@@ -1677,8 +1726,7 @@
       return rows;
     }
 
-    function buildTaskCreationRateByLevel() {
-      const exposureHours = buildLevelExposureHours();
+    function buildTaskCreationRateByLevel(exposureHours = buildLevelExposureHours()) {
       const counts = new Map();
       for (const c of taskHistory.creations) {
         const bucket = levelBucketOf(levelAt(c.time));
@@ -1832,6 +1880,75 @@
       return points;
     }
 
+    // Burndown overlays (tasks, habits): each drawn on its own 0..total
+    // fraction of the plot height, normalized independently so a "3/8
+    // tasks done" line and a "1/2 habits done" line stay visually
+    // comparable despite different totals. Hoisted out of renderChart()
+    // (rather than defined as a closure inside it) since none of its
+    // logic depends on renderChart()'s own local state beyond what's
+    // already passed in explicitly.
+    function drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, data, color, pulseDotId, statElId, doneLabel) {
+      const series = remainingSeries(data, startMs, endMs);
+      const pulseDot = document.getElementById(pulseDotId);
+      const statEl = document.getElementById(statElId);
+      if (!series) {
+        pulseDot.classList.remove('active');
+        statEl.textContent = '';
+        return;
+      }
+      const yOfFrac = (n) => padT + plotH - (n / Math.max(data.total, 1)) * plotH;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      series.forEach(([t, n], i) => {
+        const x = xOf(t);
+        const y = yOfFrac(n);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const [lastT, lastN] = series[series.length - 1];
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(xOf(lastT), yOfFrac(lastN), 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      pulseDot.style.left = `${xOf(lastT)}px`;
+      pulseDot.style.top = `${yOfFrac(lastN)}px`;
+      pulseDot.style.setProperty('--pulse-color', color);
+      pulseDot.classList.add('active');
+
+      const done = data.total - lastN;
+      statEl.textContent = `${done}/${data.total} ${doneLabel}`;
+    }
+
+    // Traces a path through `points` ([t, mg] pairs), converted to pixel
+    // space via xOf/yOf. When `smooth` is true, threads a quadratic-curve
+    // spline through the samples (curve to the midpoint of each pair,
+    // using the sample itself as control point) instead of straight
+    // segments — the standard lightweight canvas line-smoothing technique.
+    // Only used for the caffeine curve; the task/habit burndown lines stay
+    // straight since they're genuine step functions, not something to blur.
+    function tracePath(ctx, points, xOf, yOf, smooth) {
+      const pts = points.map(([t, mg]) => [xOf(t), yOf(mg)]);
+      if (!smooth || pts.length < 3) {
+        pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+        return;
+      }
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      let i;
+      for (i = 1; i < pts.length - 2; i++) {
+        const xc = (pts[i][0] + pts[i + 1][0]) / 2;
+        const yc = (pts[i][1] + pts[i + 1][1]) / 2;
+        ctx.quadraticCurveTo(pts[i][0], pts[i][1], xc, yc);
+      }
+      ctx.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+    }
+
     function renderChart() {
       const canvas = document.getElementById('chart');
       const dpr = window.devicePixelRatio || 1;
@@ -1895,12 +2012,7 @@
       ctx.strokeStyle = primary;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      points.forEach(([t, mg], i) => {
-        const x = xOf(t);
-        const y = yOf(mg);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
+      tracePath(ctx, points, xOf, yOf, true);
       ctx.stroke();
 
       const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + plotH);
@@ -1908,25 +2020,21 @@
       fillGradient.addColorStop(1, toRgba(primary, 0));
       ctx.fillStyle = fillGradient;
       ctx.beginPath();
-      points.forEach(([t, mg], i) => {
-        const x = xOf(t);
-        const y = yOf(mg);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
+      tracePath(ctx, points, xOf, yOf, true);
       ctx.lineTo(xOf(points[points.length - 1][0]), padT + plotH);
       ctx.lineTo(xOf(points[0][0]), padT + plotH);
       ctx.closePath();
       ctx.fill();
 
+      const nowLevel = levelAt(now);
       ctx.fillStyle = primary;
       ctx.beginPath();
-      ctx.arc(xOf(now), yOf(levelAt(now)), 3.5, 0, Math.PI * 2);
+      ctx.arc(xOf(now), yOf(nowLevel), 3.5, 0, Math.PI * 2);
       ctx.fill();
 
       const pulseDot = document.getElementById('chartPulseDot');
       pulseDot.style.left = `${xOf(now)}px`;
-      pulseDot.style.top = `${yOf(levelAt(now))}px`;
+      pulseDot.style.top = `${yOf(nowLevel)}px`;
       pulseDot.classList.add('active');
 
       const nowLabel = document.getElementById('chartNowLabel');
@@ -1938,47 +2046,8 @@
       nowLine.style.top = `${padT}px`;
       nowLine.style.height = `${plotH}px`;
 
-      function drawRemainingLine(data, color, pulseDotId, statElId, doneLabel) {
-        const series = remainingSeries(data, startMs, endMs);
-        const pulseDot = document.getElementById(pulseDotId);
-        const statEl = document.getElementById(statElId);
-        if (!series) {
-          pulseDot.classList.remove('active');
-          statEl.textContent = '';
-          return;
-        }
-        const yOfFrac = (n) => padT + plotH - (n / Math.max(data.total, 1)) * plotH;
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([2, 2]);
-        ctx.beginPath();
-        series.forEach(([t, n], i) => {
-          const x = xOf(t);
-          const y = yOfFrac(n);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        const [lastT, lastN] = series[series.length - 1];
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(xOf(lastT), yOfFrac(lastN), 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        pulseDot.style.left = `${xOf(lastT)}px`;
-        pulseDot.style.top = `${yOfFrac(lastN)}px`;
-        pulseDot.style.setProperty('--pulse-color', color);
-        pulseDot.classList.add('active');
-
-        const done = data.total - lastN;
-        statEl.textContent = `${done}/${data.total} ${doneLabel}`;
-      }
-
-      drawRemainingLine(taskData, '#f59e0b', 'taskPulseDot', 'chartTasksStat', 'tasks done today');
-      drawRemainingLine(habitData, '#22c55e', 'habitPulseDot', 'chartHabitsStat', 'habits done today');
+      drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, taskData, '#f59e0b', 'taskPulseDot', 'chartTasksStat', 'tasks done today');
+      drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, habitData, '#22c55e', 'habitPulseDot', 'chartHabitsStat', 'habits done today');
 
       if (showCrossing) {
         const crossX = xOf(crossMs);
@@ -2010,24 +2079,29 @@
     }
 
     function revealChart() {
-      if (chartRevealed) return;
-      chartRevealed = true;
       requestAnimationFrame(() => requestAnimationFrame(() => {
         document.getElementById('chartRevealMask').classList.add('revealed');
       }));
     }
 
-    function drawBarChart(canvasId, bars, color) {
+    // Shared canvas setup for the small report charts (drawBarChart,
+    // drawDualBarChart, drawSignedBarChart): sizes the backing store for
+    // devicePixelRatio, resets the transform, and clears it.
+    function setupChartCanvas(canvasId, h) {
       const canvas = document.getElementById(canvasId);
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
       const w = Math.max(rect.width, 200);
-      const h = 110;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       const ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      return { ctx, w, h };
+    }
+
+    function drawBarChart(canvasId, bars, color) {
+      const { ctx, w, h } = setupChartCanvas(canvasId, 110);
       if (bars.length === 0) return;
 
       const padL = 2;
@@ -2055,16 +2129,7 @@
     }
 
     function drawDualBarChart(canvasId, rows, getA, getB, colorA, colorB) {
-      const canvas = document.getElementById(canvasId);
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(rect.width, 200);
-      const h = 110;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
+      const { ctx, w, h } = setupChartCanvas(canvasId, 110);
       if (rows.length === 0) return;
 
       const padL = 2;
@@ -2091,16 +2156,7 @@
     }
 
     function drawSignedBarChart(canvasId, bars, posColor, negColor) {
-      const canvas = document.getElementById(canvasId);
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(rect.width, 200);
-      const h = 110;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
+      const { ctx, w, h } = setupChartCanvas(canvasId, 110);
       if (bars.length === 0) return;
 
       const padL = 2;
@@ -2139,7 +2195,10 @@
     }
 
     function renderImpact() {
-      const rateData = buildCompletionRateByLevel();
+      // Shared between the two level-bucketed rate charts below — each used
+      // to compute this expensive (~19,200-step) scan independently.
+      const exposureHours = buildLevelExposureHours();
+      const rateData = buildCompletionRateByLevel(exposureHours);
       const rateNote = document.getElementById('levelRateNote');
       rateNote.textContent =
         rateData.length === 0
@@ -2199,9 +2258,16 @@
       for (const r of tagRows) {
         const row = document.createElement('div');
         row.className = 'history-row';
-        row.innerHTML = `
-          <span>${r.label} mg <span class="meta">${r.topLabel} · ${r.topCount}/${r.total} completions</span></span>
-        `;
+        // createElement/textContent — r.topLabel is a tag title from SP's
+        // own getAllTags(), user-editable text, not safe to interpolate
+        // into innerHTML.
+        const main = document.createElement('span');
+        main.textContent = `${r.label} mg `;
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = `${r.topLabel} · ${r.topCount}/${r.total} completions`;
+        main.appendChild(meta);
+        row.appendChild(main);
         tagList.appendChild(row);
       }
 
@@ -2217,7 +2283,7 @@
         '#a855f7',
       );
 
-      const creationData = buildTaskCreationRateByLevel();
+      const creationData = buildTaskCreationRateByLevel(exposureHours);
       const creationNote = document.getElementById('taskCreationNote');
       creationNote.textContent =
         creationData.length === 0
@@ -2352,16 +2418,39 @@
             : '';
         const topLabel = mostCommonDrink(r.byDrink);
         const topNote = topLabel ? ` · ${drinkEmoji(topLabel)} ${topLabel} most common`.replace('  ', ' ') : '';
-        row.innerHTML = `
-          <span>${periodLabel(r.key, summaryPeriod)} <span class="meta">${r.count} log${r.count === 1 ? '' : 's'}${avgNote}${topNote}</span></span>
-          <span>${Math.round(r.totalMg)} mg</span>
-        `;
+        // createElement/textContent — topLabel is a synced drink name, not
+        // safe to interpolate into innerHTML (same reasoning as the
+        // quick-add/history-row fixes above).
+        const main = document.createElement('span');
+        main.textContent = `${periodLabel(r.key, summaryPeriod)} `;
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = `${r.count} log${r.count === 1 ? '' : 's'}${avgNote}${topNote}`;
+        main.appendChild(meta);
+        const mgSpan = document.createElement('span');
+        mgSpan.textContent = `${Math.round(r.totalMg)} mg`;
+        row.append(main, mgSpan);
         wrap.appendChild(row);
       }
     }
 
     function escapeMd(s) {
       return String(s).replace(/\|/g, '\\|').replace(/"/g, "'");
+    }
+
+    // Builds one mermaid xychart-beta fenced block. `values` can hold
+    // numbers or pre-formatted strings (e.g. `.toFixed(2)`) — both join
+    // fine for the bar list. Shared by every bar chart in the export.
+    function mdBarChart(title, labels, values, yLabel, yMin, yMax) {
+      return (
+        '```mermaid\n' +
+        `xychart-beta\n` +
+        `    title "${escapeMd(title)}"\n` +
+        `    x-axis [${labels.map((l) => `"${escapeMd(l)}"`).join(', ')}]\n` +
+        `    y-axis "${yLabel}" ${yMin} --> ${yMax}\n` +
+        `    bar [${values.join(', ')}]\n` +
+        '```\n'
+      );
     }
 
     function buildExportMarkdown() {
@@ -2383,16 +2472,16 @@
       md += `\n`;
 
       if (rows.length > 0) {
-        const labels = rows.map((r) => `"${escapeMd(periodLabel(r.key, summaryPeriod))}"`).join(', ');
-        const values = rows.map((r) => Math.round(r.totalMg)).join(', ');
         const maxVal = Math.max(...rows.map((r) => r.totalMg), state.threshold) * 1.15;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "${periodTitle} caffeine intake (mg)"\n`;
-        md += `    x-axis [${labels}]\n`;
-        md += `    y-axis "mg" 0 --> ${Math.round(maxVal)}\n`;
-        md += `    bar [${values}]\n`;
-        md += '```\n\n';
+        md += mdBarChart(
+          `${periodTitle} caffeine intake (mg)`,
+          rows.map((r) => periodLabel(r.key, summaryPeriod)),
+          rows.map((r) => Math.round(r.totalMg)),
+          'mg',
+          0,
+          Math.round(maxVal),
+        );
+        md += '\n';
       }
 
       const byDrink = new Map();
@@ -2418,7 +2507,8 @@
         md += '```\n';
       }
 
-      const rateData = buildCompletionRateByLevel();
+      const exportExposureHours = buildLevelExposureHours();
+      const rateData = buildCompletionRateByLevel(exportExposureHours);
       if (rateData.length > 0) {
         md += `\n## Task completions by caffeine level\n\n`;
         md += `Completions per hour of exposure to each level, from ${taskHistory.completions.length} tracked completions.\n\n`;
@@ -2427,13 +2517,14 @@
           md += `| ${r.label} | ${r.rate.toFixed(2)} | ${r.count} | ${Math.round(r.hours)} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Completions per hour by caffeine level (mg)"\n`;
-        md += `    x-axis [${rateData.map((r) => `"${r.label}"`).join(', ')}]\n`;
-        md += `    y-axis "completions/hour" 0 --> ${Math.round(Math.max(...rateData.map((r) => r.rate)) * 1.15 * 100) / 100 || 1}\n`;
-        md += `    bar [${rateData.map((r) => r.rate.toFixed(2)).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Completions per hour by caffeine level (mg)',
+          rateData.map((r) => r.label),
+          rateData.map((r) => r.rate.toFixed(2)),
+          'completions/hour',
+          0,
+          Math.round(Math.max(...rateData.map((r) => r.rate)) * 1.15 * 100) / 100 || 1,
+        );
       }
 
       const trackedRows = buildDailyTrackedVsCaffeine();
@@ -2444,20 +2535,23 @@
           md += `| ${escapeMd(r.key)} | ${Math.round(r.mg)} | ${r.trackedMin} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Daily caffeine (mg)"\n`;
-        md += `    x-axis [${trackedRows.map((r) => `"${r.key}"`).join(', ')}]\n`;
-        md += `    y-axis "mg" 0 --> ${Math.round(Math.max(...trackedRows.map((r) => r.mg)) * 1.15) || 1}\n`;
-        md += `    bar [${trackedRows.map((r) => Math.round(r.mg)).join(', ')}]\n`;
-        md += '```\n\n';
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Daily time tracked (min)"\n`;
-        md += `    x-axis [${trackedRows.map((r) => `"${r.key}"`).join(', ')}]\n`;
-        md += `    y-axis "min" 0 --> ${Math.round(Math.max(...trackedRows.map((r) => r.trackedMin)) * 1.15) || 1}\n`;
-        md += `    bar [${trackedRows.map((r) => r.trackedMin).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Daily caffeine (mg)',
+          trackedRows.map((r) => r.key),
+          trackedRows.map((r) => Math.round(r.mg)),
+          'mg',
+          0,
+          Math.round(Math.max(...trackedRows.map((r) => r.mg)) * 1.15) || 1,
+        );
+        md += '\n';
+        md += mdBarChart(
+          'Daily time tracked (min)',
+          trackedRows.map((r) => r.key),
+          trackedRows.map((r) => r.trackedMin),
+          'min',
+          0,
+          Math.round(Math.max(...trackedRows.map((r) => r.trackedMin)) * 1.15) || 1,
+        );
       }
 
       const accuracyData = buildEstimateAccuracyByLevel();
@@ -2470,13 +2564,14 @@
         }
         md += `\n`;
         const maxAbs = Math.max(...accuracyData.map((r) => Math.abs(r.avgPctError)), 1) * 1.15;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Estimate accuracy by caffeine level (% over/under)"\n`;
-        md += `    x-axis [${accuracyData.map((r) => `"${r.label}"`).join(', ')}]\n`;
-        md += `    y-axis "% over/under" ${Math.round(-maxAbs)} --> ${Math.round(maxAbs)}\n`;
-        md += `    bar [${accuracyData.map((r) => r.avgPctError.toFixed(1)).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Estimate accuracy by caffeine level (% over/under)',
+          accuracyData.map((r) => r.label),
+          accuracyData.map((r) => r.avgPctError.toFixed(1)),
+          '% over/under',
+          Math.round(-maxAbs),
+          Math.round(maxAbs),
+        );
       }
 
       const hourData = buildCompletionsByHour().map((b, hour) => ({ label: `${hour}h`, value: b.value }));
@@ -2488,13 +2583,14 @@
           if (b.value > 0) md += `| ${b.label} | ${b.value} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Task completions by hour of day"\n`;
-        md += `    x-axis [${hourData.map((b) => `"${b.label}"`).join(', ')}]\n`;
-        md += `    y-axis "completions" 0 --> ${Math.round(Math.max(...hourData.map((b) => b.value)) * 1.15) || 1}\n`;
-        md += `    bar [${hourData.map((b) => b.value).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Task completions by hour of day',
+          hourData.map((b) => b.label),
+          hourData.map((b) => b.value),
+          'completions',
+          0,
+          Math.round(Math.max(...hourData.map((b) => b.value)) * 1.15) || 1,
+        );
       }
 
       const tagRows = buildTopTagByLevel();
@@ -2516,16 +2612,17 @@
           md += `| ${r.label} | ${Math.round(r.avgMin)} | ${r.count} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Focus-session length by caffeine level (min, this session only)"\n`;
-        md += `    x-axis [${focusRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
-        md += `    y-axis "min" 0 --> ${Math.round(Math.max(...focusRows.map((r) => r.avgMin)) * 1.15) || 1}\n`;
-        md += `    bar [${focusRows.map((r) => Math.round(r.avgMin)).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Focus-session length by caffeine level (min, this session only)',
+          focusRows.map((r) => r.label),
+          focusRows.map((r) => Math.round(r.avgMin)),
+          'min',
+          0,
+          Math.round(Math.max(...focusRows.map((r) => r.avgMin)) * 1.15) || 1,
+        );
       }
 
-      const creationRows = buildTaskCreationRateByLevel();
+      const creationRows = buildTaskCreationRateByLevel(exportExposureHours);
       if (creationRows.length > 0) {
         md += `\n## Task creation rate by caffeine level\n\n`;
         md += `New tasks per hour of exposure to each level, from ${taskHistory.creations.length} tracked task creations.\n\n`;
@@ -2534,13 +2631,14 @@
           md += `| ${r.label} | ${r.rate.toFixed(2)} | ${r.count} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "New tasks per hour by caffeine level (mg)"\n`;
-        md += `    x-axis [${creationRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
-        md += `    y-axis "tasks/hour" 0 --> ${Math.round(Math.max(...creationRows.map((r) => r.rate)) * 1.15 * 100) / 100 || 1}\n`;
-        md += `    bar [${creationRows.map((r) => r.rate.toFixed(2)).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'New tasks per hour by caffeine level (mg)',
+          creationRows.map((r) => r.label),
+          creationRows.map((r) => r.rate.toFixed(2)),
+          'tasks/hour',
+          0,
+          Math.round(Math.max(...creationRows.map((r) => r.rate)) * 1.15 * 100) / 100 || 1,
+        );
       }
 
       const deadlineRows = buildCaffeineByDeadlineProximity();
@@ -2552,13 +2650,14 @@
           md += `| ${r.label} | ${Math.round(r.avgMg)} | ${r.days} |\n`;
         }
         md += `\n`;
-        md += '```mermaid\n';
-        md += `xychart-beta\n`;
-        md += `    title "Avg. daily caffeine by deadline proximity (mg)"\n`;
-        md += `    x-axis [${deadlineRows.map((r) => `"${r.label}"`).join(', ')}]\n`;
-        md += `    y-axis "mg" 0 --> ${Math.round(Math.max(...deadlineRows.map((r) => r.avgMg)) * 1.15) || 1}\n`;
-        md += `    bar [${deadlineRows.map((r) => Math.round(r.avgMg)).join(', ')}]\n`;
-        md += '```\n';
+        md += mdBarChart(
+          'Avg. daily caffeine by deadline proximity (mg)',
+          deadlineRows.map((r) => r.label),
+          deadlineRows.map((r) => Math.round(r.avgMg)),
+          'mg',
+          0,
+          Math.round(Math.max(...deadlineRows.map((r) => r.avgMg)) * 1.15) || 1,
+        );
       }
 
       return md;
@@ -2622,35 +2721,15 @@
       const name = nameEl.value.trim() || 'Custom';
       const mg = parseFloat(mgEl.value);
       const drinkTimeMin = Math.max(parseFloat(timeEl.value) || 0, 0);
-      if (!mg || mg <= 0) {
-        p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
-        return;
-      }
+      if (!validateMg(mg)) return;
       addEntry(name, mg, drinkTimeMin);
       nameEl.value = '';
       mgEl.value = '';
       timeEl.value = '';
     });
 
-    document.getElementById('halfLifeInput').addEventListener('change', (ev) => {
-      const val = parseFloat(ev.target.value);
-      if (val >= 2 && val <= 10) {
-        state.halfLifeHours = val;
-        save();
-        renderAll();
-        flashDataCards();
-      }
-    });
-
-    document.getElementById('thresholdInput').addEventListener('change', (ev) => {
-      const val = parseFloat(ev.target.value);
-      if (val >= 0 && val <= 400) {
-        state.threshold = val;
-        save();
-        renderAll();
-        flashDataCards();
-      }
-    });
+    bindNumberSetting('halfLifeInput', 'halfLifeHours', 2, 10);
+    bindNumberSetting('thresholdInput', 'threshold', 0, 400);
 
     const newDrinkEmojiBtn = document.getElementById('newDrinkEmojiBtn');
     newDrinkEmojiBtn.addEventListener('click', () =>
@@ -2671,10 +2750,7 @@
         p.showSnack?.({ msg: 'Enter a drink name', type: 'ERROR' });
         return;
       }
-      if (!mg || mg <= 0) {
-        p.showSnack?.({ msg: 'Enter a valid mg amount', type: 'ERROR' });
-        return;
-      }
+      if (!validateMg(mg)) return;
       addDrink(newDrinkEmoji, label, mg, drinkTimeMin);
       newDrinkEmoji = '☕';
       newDrinkEmojiBtn.textContent = '☕';
@@ -2713,7 +2789,7 @@
       updateClock();
       refreshTasks();
       refreshHabits();
-      refreshTimer = setInterval(renderAll, 5000);
+      setInterval(renderAll, 5000);
       setInterval(refreshHabits, 30000);
       setInterval(refreshTasks, 30000);
       setInterval(updateClock, 1000);

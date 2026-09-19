@@ -38,7 +38,7 @@ caffeine level decay using a half-life model, and its effects on productivity th
 
 1. Grab a release zip
 2. In Super Productivity: **Settings → Plugins → Upload Plugin**
-3. Open it from the header button or the menu entry ("Caffeine Tracker")
+3. Open it from the ☕ header button
 
 
 ## Notes
