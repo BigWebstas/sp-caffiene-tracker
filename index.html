@@ -123,7 +123,8 @@
     padding-top: var(--s2);
   }
 
-  .modal-body .card:last-child {
+  .modal-body .card:last-child,
+  .summary-list {
     margin-bottom: var(--s2);
   }
 
@@ -215,9 +216,7 @@
   }
 
   .gauge-canvas {
-    width: 100%;
     height: 130px;
-    display: block;
   }
 
   .gauge-stats {
@@ -232,7 +231,8 @@
     align-items: center;
   }
 
-  .gauge-stat .stat-label {
+  .gauge-stat .stat-label,
+  .quick-add .drink-mg {
     font-size: 11px;
     color: var(--text-color-muted);
   }
@@ -242,7 +242,8 @@
     font-weight: 600;
   }
 
-  .gauge-stat.container .stat-value {
+  .gauge-stat.container .stat-value,
+  .section-title-row .daily-total {
     color: var(--c-primary);
   }
 
@@ -283,9 +284,37 @@
     font-size: 20px;
   }
 
-  .quick-add .drink-mg {
-    font-size: 11px;
+  .sleep-form {
+    display: flex;
+    align-items: center;
+    gap: var(--s);
+    padding: var(--s2);
+  }
+
+  .sleep-form input {
+    flex: 0 0 90px;
+    min-width: 90px;
+  }
+
+  .star-rating {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .star-rating button {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
     color: var(--text-color-muted);
+    cursor: pointer;
+  }
+
+  .star-rating button.filled {
+    color: #f59e0b;
   }
 
   .custom-form {
@@ -305,7 +334,12 @@
     min-width: 105px;
   }
 
-  .chart-wrap {
+  .chart-wrap,
+  .impact-card,
+  .daily-breakdown,
+  .history,
+  .manage-drinks,
+  .summary-card {
     padding: var(--s2);
   }
 
@@ -325,7 +359,7 @@
 
   .chart-series-legend {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-evenly;
     font-size: 11px;
     color: var(--text-color-muted);
     margin-top: 2px;
@@ -347,19 +381,18 @@
     border-radius: 1px;
   }
 
-  .impact-card {
-    padding: var(--s2);
-  }
-
-  .impact-chart-block {
+  .impact-chart-block,
+  .daily-breakdown-day {
     margin-bottom: var(--s3);
   }
 
-  .impact-chart-block:last-child {
+  .impact-chart-block:last-child,
+  .daily-breakdown-day:last-child {
     margin-bottom: 0;
   }
 
-  .impact-chart-title {
+  .impact-chart-title,
+  .daily-breakdown-title {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-color-muted);
@@ -367,9 +400,7 @@
   }
 
   .impact-canvas {
-    width: 100%;
     height: 110px;
-    display: block;
   }
 
   .impact-note {
@@ -379,8 +410,13 @@
     margin-top: var(--s-half);
   }
 
-  .history {
-    padding: var(--s2);
+  .daily-breakdown-title {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .daily-breakdown-canvas {
+    height: 90px;
   }
 
   .history-row {
@@ -443,10 +479,6 @@
     width: 80px;
   }
 
-  .manage-drinks {
-    padding: var(--s2);
-  }
-
   .drink-row,
   .drink-row-labels {
     display: grid;
@@ -476,9 +508,6 @@
 
   .emoji-popover {
     position: fixed;
-    /* Must sit above .modal-overlay's z-index: 2000, since it's opened
-       from the drink emoji picker inside the Settings modal — at 1000 it
-       rendered underneath the modal, out of click range. */
     z-index: 2100;
     background: var(--card-bg);
     border: 1px solid var(--divider-color);
@@ -545,14 +574,6 @@
     justify-content: space-between;
   }
 
-  .section-title-row .daily-total {
-    color: var(--c-primary);
-  }
-
-  .summary-card {
-    padding: var(--s2);
-  }
-
   .period-toggle {
     display: flex;
     gap: var(--s);
@@ -568,10 +589,6 @@
   .period-toggle button.active {
     background: var(--c-primary);
     color: #fff;
-  }
-
-  .summary-list {
-    margin-bottom: var(--s2);
   }
 
   .export-btn {
@@ -651,11 +668,7 @@
       transform: scale(0.4);
       opacity: 0.55;
     }
-    70% {
-      transform: scale(2.2);
-      opacity: 0;
-    }
-    100% {
+    70%, 100% {
       transform: scale(2.2);
       opacity: 0;
     }
@@ -712,7 +725,7 @@
   <div class="section-title">Quick add</div>
   <div class="card quick-add" id="quickAdd"></div>
 
-  <div class="section-title">Custom</div>
+  <div class="section-title">Custom Drink</div>
   <div class="card custom-form">
     <input type="text" id="customName" placeholder="Drink name" />
     <input type="number" id="customMg" placeholder="mg" min="1" />
@@ -720,7 +733,21 @@
     <button class="btn-primary" id="customAddBtn">Add</button>
   </div>
 
-  <div class="section-title">Decay curve (next 18h)</div>
+  <div class="section-title">Sleep (Optional)</div>
+  <div class="card sleep-form">
+    <input type="number" id="sleepHoursInput" placeholder="hrs" min="0" max="23" />
+    <input type="number" id="sleepMinsInput" placeholder="min" min="0" max="59" />
+    <div class="star-rating" id="sleepRatingInput">
+      <button type="button" data-star="1">★</button>
+      <button type="button" data-star="2">★</button>
+      <button type="button" data-star="3">★</button>
+      <button type="button" data-star="4">★</button>
+      <button type="button" data-star="5">★</button>
+    </div>
+    <button class="btn-primary" id="sleepAddBtn">Add</button>
+  </div>
+
+  <div class="section-title">Decay curve</div>
   <div class="card chart-wrap">
     <div class="chart-canvas-wrap">
       <canvas id="chart"></canvas>
@@ -736,12 +763,15 @@
       <span id="chartLegendEnd">+18h</span>
     </div>
     <div class="chart-series-legend" id="chartSeriesLegend">
-      <span><i class="legend-swatch" style="background: var(--c-primary)"></i>Caffeine (mg)</span>
+      <span><i class="legend-swatch" style="background: var(--c-primary)"></i>Caffeine (mg)<span id="chartMetabolizedStat"></span></span>
       <span id="chartTasksLegend" class="chart-tasks-legend">
         <i class="legend-swatch" style="background: #f59e0b"></i><span id="chartTasksStat"></span>
       </span>
       <span id="chartHabitsLegend" class="chart-tasks-legend">
         <i class="legend-swatch" style="background: #22c55e"></i><span id="chartHabitsStat"></span>
+      </span>
+      <span id="chartSleepLegend" class="chart-tasks-legend">
+        <i class="legend-swatch" style="background: var(--c-warn)"></i><span id="chartSleepStat"></span>
       </span>
     </div>
   </div>
@@ -806,22 +836,13 @@
             <div class="summary-list" id="tagByLevelList"></div>
             <div class="impact-note" id="tagByLevelNote">Not enough data yet</div>
           </div>
-          <div class="impact-chart-block">
-            <div class="impact-chart-title">Focus-session length by caffeine level (this session only)</div>
-            <canvas id="focusSessionChart" class="impact-canvas"></canvas>
-            <div class="impact-note" id="focusSessionNote">Not enough data yet</div>
-          </div>
-          <div class="impact-chart-block">
-            <div class="impact-chart-title">Task creation rate by caffeine level</div>
-            <canvas id="taskCreationChart" class="impact-canvas"></canvas>
-            <div class="impact-note" id="taskCreationNote">Not enough data yet</div>
-          </div>
-          <div class="impact-chart-block">
-            <div class="impact-chart-title">Caffeine by deadline proximity</div>
-            <canvas id="deadlineProximityChart" class="impact-canvas"></canvas>
-            <div class="impact-note" id="deadlineProximityNote">Not enough data yet</div>
-          </div>
         </div>
+
+        <div class="section-title">Sleep log</div>
+        <div class="card history" id="sleepHistory"></div>
+
+        <div class="section-title">Daily breakdown</div>
+        <div class="card daily-breakdown" id="dailyBreakdownList"></div>
       </div>
     </div>
   </div>
@@ -842,6 +863,18 @@
           <label>
             Sleep threshold (mg)
             <input type="number" id="thresholdInput" min="0" max="400" step="5" />
+          </label>
+          <label>
+            Daily breakdown (days)
+            <input type="number" id="breakdownDaysInput" min="1" max="30" step="1" />
+          </label>
+          <label>
+            Chart hours before
+            <input type="number" id="chartHoursBeforeInput" min="1" max="48" step="1" />
+          </label>
+          <label>
+            Chart hours after
+            <input type="number" id="chartHoursAfterInput" min="1" max="48" step="1" />
           </label>
         </div>
 
@@ -874,13 +907,9 @@
   <script>
     const p = PluginAPI;
 
-    // Keep in sync with manifest.json's "version" on every release — this
-    // is what the update check compares against the latest GitHub tag.
-    const CURRENT_VERSION = '1.30.0';
+    const CURRENT_VERSION = '1.41.2';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
-    // Dotted numeric version compare (handles unequal segment counts, e.g.
-    // "1.29" vs "1.29.0", by treating a missing segment as 0).
     function isNewerVersion(a, b) {
       const pa = a.split('.').map(Number);
       const pb = b.split('.').map(Number);
@@ -919,6 +948,10 @@
 
     function newId() {
       return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function themeColor(varName, fallback) {
+      return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || fallback;
     }
 
     const colorAlphaProbe = document.createElement('div');
@@ -986,6 +1019,8 @@
       document.getElementById('reportsOverlay').classList.add('open');
       renderSummary();
       renderImpact();
+      renderSleepHistory();
+      renderDailyBreakdown();
     }
 
     function closeReports() {
@@ -1027,7 +1062,12 @@
       threshold: 50,
       entries: [],
       drinks: DEFAULT_DRINKS.map((d) => ({ ...d })),
-      habitMarks: { day: null, marks: {} },
+      habitMarks: { day: null, marks: {}, total: 0 },
+      habitDayHistory: {},
+      dailyBreakdownDays: 7,
+      chartHoursBefore: 4,
+      chartHoursAfter: 18,
+      sleepEntries: [],
     };
     let hasLoadedOnce = false;
 
@@ -1118,7 +1158,17 @@
       document.getElementById('chartNowLabel').textContent = `Now · ${fmtTime(Date.now())}`;
     }
 
+    function mergeMarksMin(a, b) {
+      const out = { ...a };
+      for (const [id, t] of Object.entries(b)) {
+        out[id] = id in out ? Math.min(out[id], t) : t;
+      }
+      return out;
+    }
+
     async function load() {
+      const prevHabitMarks = state.habitMarks;
+      const prevHabitDayHistory = state.habitDayHistory;
       try {
         const raw = await p.loadSyncedData();
         if (raw) {
@@ -1128,8 +1178,43 @@
       } catch (e) {
         console.error('[Caffeine Tracker] failed to load data', e);
       }
+      if (prevHabitMarks && state.habitMarks && prevHabitMarks.day === state.habitMarks.day) {
+        state.habitMarks = { ...state.habitMarks, marks: mergeMarksMin(state.habitMarks.marks, prevHabitMarks.marks) };
+      }
+      if (prevHabitDayHistory) {
+        const merged = { ...(state.habitDayHistory || {}) };
+        for (const [day, entry] of Object.entries(prevHabitDayHistory)) {
+          const remote = merged[day];
+          merged[day] = remote
+            ? { total: Math.max(remote.total, entry.total), marks: mergeMarksMin(remote.marks, entry.marks) }
+            : entry;
+        }
+        state.habitDayHistory = merged;
+      }
       const cutoff = Date.now() - 400 * 24 * 3600 * 1000;
       state.entries = (state.entries || []).filter((e) => e.time >= cutoff);
+      const migratedSleep = (state.sleepEntries || [])
+        .map((e) =>
+          typeof e.durationMin === 'number'
+            ? { ...e, dayKey: e.dayKey || dateKeyLocal(e.time) }
+            : e.bedTime != null && e.wakeTime != null
+              ? { id: e.id, time: e.wakeTime, durationMin: (e.wakeTime - e.bedTime) / 60000, rating: 0, dayKey: dateKeyLocal(e.wakeTime) }
+              : null,
+        )
+        .filter((e) => e && e.time >= cutoff);
+      const sleepByDay = new Map();
+      for (const e of migratedSleep) {
+        const cur = sleepByDay.get(e.dayKey);
+        if (!cur) sleepByDay.set(e.dayKey, { ...e });
+        else {
+          cur.durationMin += e.durationMin;
+          if (e.time > cur.time) {
+            cur.time = e.time;
+            cur.rating = e.rating;
+          }
+        }
+      }
+      state.sleepEntries = Array.from(sleepByDay.values());
       if (!state.drinks || state.drinks.length === 0) {
         state.drinks = DEFAULT_DRINKS.map((d) => ({ ...d }));
       }
@@ -1141,10 +1226,6 @@
     }
 
     async function save() {
-      // Guards every call site at the one place that matters, not just the
-      // one that caused the historical data-loss incident: saving before
-      // load() has merged persisted data would overwrite it with the
-      // still-default state (empty entries, default drinks, etc).
       if (!hasLoadedOnce) return;
       try {
         await p.persistDataSynced(JSON.stringify(state));
@@ -1171,8 +1252,6 @@
       return false;
     }
 
-    // Binds a settings <input type="number"> to a state field: on change,
-    // only accepts values within [min, max], persists, and re-renders.
     function bindNumberSetting(inputId, stateField, min, max) {
       document.getElementById(inputId).addEventListener('change', (ev) => {
         const val = parseFloat(ev.target.value);
@@ -1206,6 +1285,70 @@
       flashDataCards();
     }
 
+    function starString(rating) {
+      return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+    }
+
+    let sleepRatingValue = 0;
+
+    function renderSleepRatingInput() {
+      document.querySelectorAll('#sleepRatingInput button').forEach((btn) => {
+        btn.classList.toggle('filled', Number(btn.dataset.star) <= sleepRatingValue);
+      });
+    }
+
+    function addSleepEntry(durationMin, rating) {
+      const now = Date.now();
+      const dayKey = dateKeyLocal(now);
+      const existing = state.sleepEntries.find((e) => e.dayKey === dayKey);
+      if (existing) {
+        existing.durationMin += durationMin;
+        existing.rating = rating;
+        existing.time = now;
+      } else {
+        state.sleepEntries.push({ id: newId(), dayKey, time: now, durationMin, rating });
+      }
+      const cutoff = now - 400 * 24 * 3600000;
+      state.sleepEntries = state.sleepEntries.filter((e) => e.time >= cutoff);
+      save();
+      renderSleepHistory();
+      renderChart();
+    }
+
+    function deleteSleepEntry(id) {
+      state.sleepEntries = state.sleepEntries.filter((e) => e.id !== id);
+      save();
+      renderSleepHistory();
+      renderChart();
+    }
+
+    function renderSleepHistory() {
+      const wrap = document.getElementById('sleepHistory');
+      wrap.innerHTML = '';
+      const rows = [...state.sleepEntries].sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+      if (rows.length === 0) {
+        wrap.innerHTML = '<div class="empty-state">No sleep logged yet</div>';
+        return;
+      }
+      for (const e of rows) {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+        const dateLabel = new Date(dayKeyToMs(e.dayKey)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const main = document.createElement('span');
+        main.textContent = `${dateLabel} · ${fmtDuration(e.durationMin * 60000)} `;
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = starString(e.rating || 0);
+        main.appendChild(meta);
+        row.appendChild(main);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = 'Remove';
+        delBtn.addEventListener('click', () => deleteSleepEntry(e.id));
+        row.appendChild(delBtn);
+        wrap.appendChild(row);
+      }
+    }
+
     function renderQuickAdd() {
       const wrap = document.getElementById('quickAdd');
       wrap.innerHTML = '';
@@ -1213,10 +1356,6 @@
         const btn = document.createElement('button');
         btn.className = d.mg < 80 ? 'tier-light' : d.mg <= 150 ? 'tier-medium' : 'tier-heavy';
 
-        // Built with createElement/textContent, not innerHTML: d.label and
-        // d.emoji come from synced state (persistDataSynced can deliver a
-        // payload that was never typed on this device), so interpolating
-        // them into innerHTML would let a malicious drink name execute.
         const emojiSpan = document.createElement('span');
         emojiSpan.className = 'drink-emoji';
         emojiSpan.textContent = d.emoji;
@@ -1364,10 +1503,9 @@
       const r = Math.min(w / 2 - 16, h - 24);
       const lineWidth = 14;
 
-      const styles = getComputedStyle(document.documentElement);
-      const track = styles.getPropertyValue('--text-color-muted').trim() || '#888';
-      const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
-      const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
+      const track = themeColor('--text-color-muted', '#888');
+      const primary = themeColor('--c-primary', '#7c4dff');
+      const warn = themeColor('--c-warn', '#e53935');
 
       ctx.lineCap = 'round';
       ctx.lineWidth = lineWidth;
@@ -1395,7 +1533,7 @@
       }
 
       const remainingPct = totalDosed > 0 ? Math.round((remaining / totalDosed) * 100) : 0;
-      const metabolizedPct = totalDosed > 0 ? 100 - remainingPct : 0;
+      const metabolizedPct = totalDosed > 0 ? Math.max(100 - remainingPct, 0) : 0;
       document.getElementById('metabolizedStat').textContent = `${Math.round(metabolized)} mg · ${metabolizedPct}%`;
 
       const { totalMg: cupTotal, leftMg: cupLeft } = containerStatus(Date.now());
@@ -1412,12 +1550,13 @@
     let gaugeAnimFrame = null;
     let gaugeDisplayed = { remaining: 0, totalDosed: 0 };
 
+    function totalMgToday() {
+      const todayStartMs = new Date().setHours(0, 0, 0, 0);
+      return state.entries.filter((e) => e.time >= todayStartMs).reduce((s, e) => s + e.mg, 0);
+    }
+
     function renderGauge() {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const targetTotalDosed = state.entries
-        .filter((e) => e.time >= todayStart.getTime())
-        .reduce((s, e) => s + e.mg, 0);
+      const targetTotalDosed = totalMgToday();
       const targetRemaining = levelAt(Date.now());
 
       if (gaugeAnimFrame) cancelAnimationFrame(gaugeAnimFrame);
@@ -1448,15 +1587,21 @@
       const earliestMs = earliestDay.getTime();
 
       const now = Date.now();
+      const sampleStepMs = 15 * 60 * 1000;
       let streak = 0;
       for (let i = 0; ; i++) {
         const dayStart = new Date(now);
         dayStart.setHours(0, 0, 0, 0);
         dayStart.setDate(dayStart.getDate() - i);
-        if (dayStart.getTime() < earliestMs) break;
-        const dayEndMs = dayStart.getTime() + 24 * 3600000 - 1000;
-        const level = levelAt(Math.min(dayEndMs, now));
-        if (level >= state.threshold) break;
+        const dayStartMs = dayStart.getTime();
+        if (dayStartMs < earliestMs) break;
+        const dayEndMs = Math.min(dayStartMs + 24 * 3600000 - 1000, now);
+        let dayMax = 0;
+        for (let t = dayStartMs; t < dayEndMs; t += sampleStepMs) {
+          dayMax = Math.max(dayMax, levelAt(t));
+        }
+        dayMax = Math.max(dayMax, levelAt(dayEndMs));
+        if (dayMax >= state.threshold) break;
         streak++;
       }
       return streak;
@@ -1533,9 +1678,6 @@
       row.dataset.id = e.id;
       const rampNote = e.drinkTimeMin > 0 ? ` · sipped over ${e.drinkTimeMin}m` : '';
 
-      // createElement/textContent, not innerHTML — e.label is synced state
-      // and can arrive via PERSISTED_DATA_CHANGED without ever being typed
-      // on this device, so it must not be interpolated into markup.
       const main = document.createElement('span');
       main.textContent = `${e.label} `;
       const meta = document.createElement('span');
@@ -1620,15 +1762,12 @@
       completions: [],
       dailyTrackedMs: new Map(),
       estimateSamples: [],
-      creations: [],
-      deadlineDaysMs: [],
+      dayBuckets: new Map(),
     };
     let tagsById = new Map();
 
     async function refreshTasks() {
       if (!p.getTasks) return;
-      // These three host calls don't depend on each other, so fetch them
-      // concurrently instead of one after another.
       const [tasksResult, archivedResult, tagsResult] = await Promise.allSettled([
         p.getTasks(),
         p.getArchivedTasks ? p.getArchivedTasks() : Promise.resolve([]),
@@ -1661,8 +1800,7 @@
       const allCompletions = [];
       const dailyTrackedMs = new Map();
       const estimateSamples = [];
-      const creations = [];
-      const deadlineDaysMs = [];
+      const dayBuckets = new Map();
       for (const t of tasks.concat(archived)) {
         if (seen.has(t.id)) continue;
         seen.add(t.id);
@@ -1678,10 +1816,22 @@
         if (t.created) creations.push({ time: t.created });
         if (t.deadlineDay) deadlineDaysMs.push(dayKeyToMs(t.deadlineDay));
         else if (t.deadlineWithTime) deadlineDaysMs.push(dayKeyToMs(dateKeyLocal(t.deadlineWithTime)));
+
+        const dueDayKey = t.dueDay || (t.dueWithTime ? dateKeyLocal(t.dueWithTime) : null);
+        if (dueDayKey) {
+          let bucket = dayBuckets.get(dueDayKey);
+          if (!bucket) {
+            bucket = { total: 0, doneTimes: [] };
+            dayBuckets.set(dueDayKey, bucket);
+          }
+          bucket.total++;
+          if (t.isDone) bucket.doneTimes.push(t.doneOn || now);
+        }
       }
       allCompletions.sort((a, b) => a.time - b.time);
       creations.sort((a, b) => a.time - b.time);
-      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples, creations, deadlineDaysMs };
+      for (const bucket of dayBuckets.values()) bucket.doneTimes.sort((a, b) => a - b);
+      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples, creations, deadlineDaysMs, dayBuckets };
 
       renderChart();
       renderImpact();
@@ -1701,18 +1851,32 @@
 
       const now = Date.now();
       const todayStr = dateKeyLocal(now);
-      if (!state.habitMarks || state.habitMarks.day !== todayStr) {
-        state.habitMarks = { day: todayStr, marks: {} };
+      let changed = false;
+      if (!state.habitMarks) state.habitMarks = { day: todayStr, marks: {}, total: 0 };
+      if (state.habitMarks.day !== todayStr) {
+        if (state.habitMarks.day) {
+          if (!state.habitDayHistory) state.habitDayHistory = {};
+          state.habitDayHistory[state.habitMarks.day] = { total: state.habitMarks.total, marks: state.habitMarks.marks };
+          const cutoff = now - 30 * 24 * 3600000;
+          for (const day of Object.keys(state.habitDayHistory)) {
+            if (dayKeyToMs(day) < cutoff) delete state.habitDayHistory[day];
+          }
+        }
+        state.habitMarks = { day: todayStr, marks: {}, total: 0 };
+        changed = true;
       }
 
       const ids = Object.keys(counts || {});
-      let changed = false;
       for (const id of ids) {
         const done = (counts[id] || 0) > 0;
         if (done && !(id in state.habitMarks.marks)) {
           state.habitMarks.marks[id] = now;
           changed = true;
         }
+      }
+      if (state.habitMarks.total !== ids.length) {
+        state.habitMarks.total = ids.length;
+        changed = true;
       }
       if (changed) save();
 
@@ -1791,53 +1955,6 @@
       return rows;
     }
 
-    function buildTaskCreationRateByLevel(exposureHours = buildLevelExposureHours()) {
-      const counts = new Map();
-      for (const c of taskHistory.creations) {
-        const bucket = levelBucketOf(levelAt(c.time));
-        counts.set(bucket, (counts.get(bucket) || 0) + 1);
-      }
-      const buckets = Array.from(new Set([...exposureHours.keys(), ...counts.keys()])).sort((a, b) => a - b);
-      return buckets
-        .filter((b) => (exposureHours.get(b) || 0) >= 1)
-        .map((b) => ({
-          label: levelBucketLabel(b),
-          rate: (counts.get(b) || 0) / exposureHours.get(b),
-          count: counts.get(b) || 0,
-        }));
-    }
-
-    const DEADLINE_PROXIMITY_BUCKETS = [
-      { label: 'Due today', maxDays: 0 },
-      { label: '1-2 days out', maxDays: 2 },
-      { label: '3-7 days out', maxDays: 7 },
-      { label: 'No deadline soon', maxDays: Infinity },
-    ];
-
-    function buildCaffeineByDeadlineProximity() {
-      if (taskHistory.deadlineDaysMs.length === 0) return [];
-      const dayTotals = new Map();
-      for (const e of state.entries) {
-        const key = dateKeyLocal(e.time);
-        dayTotals.set(key, (dayTotals.get(key) || 0) + e.mg);
-      }
-      const buckets = DEADLINE_PROXIMITY_BUCKETS.map((b) => ({ ...b, sumMg: 0, days: 0 }));
-      for (const [dayKey, mg] of dayTotals) {
-        const dayMs = dayKeyToMs(dayKey);
-        let minDiffDays = Infinity;
-        for (const dMs of taskHistory.deadlineDaysMs) {
-          const diffDays = Math.round((dMs - dayMs) / 86400000);
-          if (diffDays >= 0 && diffDays < minDiffDays) minDiffDays = diffDays;
-        }
-        const bucket = buckets.find((b) => minDiffDays <= b.maxDays) || buckets[buckets.length - 1];
-        bucket.sumMg += mg;
-        bucket.days += 1;
-      }
-      return buckets
-        .filter((b) => b.days > 0)
-        .map((b) => ({ label: b.label, avgMg: b.sumMg / b.days, days: b.days }));
-    }
-
     function buildEstimateAccuracyByLevel() {
       const buckets = new Map();
       for (const s of taskHistory.estimateSamples) {
@@ -1868,7 +1985,7 @@
     }
 
     function buildTopTagByLevel() {
-      const buckets = new Map(); // bucket -> Map(tagLabel -> count)
+      const buckets = new Map();
       for (const c of taskHistory.completions) {
         if (!c.tagIds || c.tagIds.length === 0) continue;
         const bucket = levelBucketOf(levelAt(c.time));
@@ -1896,40 +2013,11 @@
         });
     }
 
-    let focusSessionStartMs = null;
-    const focusSessions = []; // { durationMs, level }
-
-    function onCurrentTaskChange() {
-      const now = Date.now();
-      if (focusSessionStartMs !== null) {
-        const durationMs = now - focusSessionStartMs;
-        if (durationMs >= 60000) {
-          focusSessions.push({ durationMs, level: levelAt(focusSessionStartMs) });
-        }
-      }
-      focusSessionStartMs = now;
-      renderImpact();
-    }
-
-    function buildFocusSessionLengthByLevel() {
-      const buckets = new Map(); // bucket -> { sumMin, count }
-      for (const s of focusSessions) {
-        const bucket = levelBucketOf(s.level);
-        const cur = buckets.get(bucket) || { sumMin: 0, count: 0 };
-        cur.sumMin += s.durationMs / 60000;
-        cur.count += 1;
-        buckets.set(bucket, cur);
-      }
-      return Array.from(buckets.entries())
-        .sort((a, b) => a[0] - b[0])
-        .map(([b, v]) => ({ label: levelBucketLabel(b), avgMin: v.sumMin / v.count, count: v.count }));
-    }
-
-    function remainingSeries(data, startMs, endMs) {
-      if (!data.total) return null;
+    function remainingSeries(data, startMs, endMs, alwaysShow) {
       const now = Date.now();
       const clampedEnd = Math.min(now, endMs);
       if (clampedEnd <= startMs) return null;
+      if (!data.total) return alwaysShow ? [[startMs, 1], [clampedEnd, 1]] : null;
 
       const preCount = data.completions.filter((c) => c.time <= startMs).length;
       let remaining = data.total - preCount;
@@ -1945,24 +2033,10 @@
       return points;
     }
 
-    // Burndown overlays (tasks, habits): each drawn on its own 0..total
-    // fraction of the plot height, normalized independently so a "3/8
-    // tasks done" line and a "1/2 habits done" line stay visually
-    // comparable despite different totals. Hoisted out of renderChart()
-    // (rather than defined as a closure inside it) since none of its
-    // logic depends on renderChart()'s own local state beyond what's
-    // already passed in explicitly.
-    function drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, data, color, pulseDotId, statElId, doneLabel) {
-      const series = remainingSeries(data, startMs, endMs);
-      const pulseDot = document.getElementById(pulseDotId);
-      const statEl = document.getElementById(statElId);
-      if (!series) {
-        pulseDot.classList.remove('active');
-        statEl.textContent = '';
-        return;
-      }
-      const yOfFrac = (n) => padT + plotH - (n / Math.max(data.total, 1)) * plotH;
-
+    function drawStepOverlay(ctx, xOf, padT, plotH, startMs, endMs, data, color, yOffset = 0, alwaysShow = false) {
+      const series = remainingSeries(data, startMs, endMs, alwaysShow);
+      if (!series) return null;
+      const yOfFrac = (n) => padT + plotH - (n / Math.max(data.total, 1)) * plotH + yOffset;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([2, 2]);
@@ -1975,7 +2049,19 @@
       });
       ctx.stroke();
       ctx.setLineDash([]);
+      return { series, yOfFrac };
+    }
 
+    function drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, data, color, pulseDotId, statElId, doneLabel, yOffset = 0, alwaysShow = false) {
+      const pulseDot = document.getElementById(pulseDotId);
+      const statEl = document.getElementById(statElId);
+      const result = drawStepOverlay(ctx, xOf, padT, plotH, startMs, endMs, data, color, yOffset, alwaysShow);
+      if (!result) {
+        pulseDot.classList.remove('active');
+        statEl.textContent = '';
+        return;
+      }
+      const { series, yOfFrac } = result;
       const [lastT, lastN] = series[series.length - 1];
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -1987,17 +2073,10 @@
       pulseDot.style.setProperty('--pulse-color', color);
       pulseDot.classList.add('active');
 
-      const done = data.total - lastN;
+      const done = data.total ? data.total - lastN : 0;
       statEl.textContent = `${done}/${data.total} ${doneLabel}`;
     }
 
-    // Traces a path through `points` ([t, mg] pairs), converted to pixel
-    // space via xOf/yOf. When `smooth` is true, threads a quadratic-curve
-    // spline through the samples (curve to the midpoint of each pair,
-    // using the sample itself as control point) instead of straight
-    // segments — the standard lightweight canvas line-smoothing technique.
-    // Only used for the caffeine curve; the task/habit burndown lines stay
-    // straight since they're genuine step functions, not something to blur.
     function tracePath(ctx, points, xOf, yOf, smooth) {
       const pts = points.map(([t, mg]) => [xOf(t), yOf(mg)]);
       if (!smooth || pts.length < 3) {
@@ -2014,6 +2093,25 @@
       ctx.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
     }
 
+    function drawCurveFill(ctx, points, xOf, yOf, padT, plotH, primary, lineWidth, fillAlpha) {
+      ctx.strokeStyle = primary;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      tracePath(ctx, points, xOf, yOf, true);
+      ctx.stroke();
+
+      const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+      fillGradient.addColorStop(0, toRgba(primary, fillAlpha));
+      fillGradient.addColorStop(1, toRgba(primary, 0));
+      ctx.fillStyle = fillGradient;
+      ctx.beginPath();
+      tracePath(ctx, points, xOf, yOf, true);
+      ctx.lineTo(xOf(points[points.length - 1][0]), padT + plotH);
+      ctx.lineTo(xOf(points[0][0]), padT + plotH);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     function renderChart() {
       const canvas = document.getElementById('chart');
       const dpr = window.devicePixelRatio || 1;
@@ -2027,12 +2125,22 @@
       ctx.clearRect(0, 0, w, h);
 
       const now = Date.now();
-      const startMs = now - 4 * 3600000;
-      const endMs = now + 18 * 3600000;
+      const startMs = now - state.chartHoursBefore * 3600000;
+      const endMs = now + state.chartHoursAfter * 3600000;
       const stepMs = 15 * 60000;
 
       document.getElementById('chartLegendStart').textContent = fmtChartLabel(startMs, now);
       document.getElementById('chartLegendEnd').textContent = fmtChartLabel(endMs, now);
+
+      const todaySleep = state.sleepEntries.find((e) => e.dayKey === dateKeyLocal(now));
+      document.getElementById('chartSleepStat').textContent = todaySleep
+        ? `${fmtDuration(todaySleep.durationMin * 60000)} sleep`
+        : '';
+
+      const totalDosedToday = totalMgToday();
+      const metabolizedToday = Math.max(totalDosedToday - levelAt(now), 0);
+      document.getElementById('chartMetabolizedStat').textContent =
+        totalDosedToday > 0 ? ` · ${Math.round(metabolizedToday)} mg metabolized` : '';
 
       const points = [];
       let maxMg = state.threshold;
@@ -2053,11 +2161,9 @@
       const xOf = (t) => padL + ((t - startMs) / (endMs - startMs)) * plotW;
       const yOf = (mg) => padT + plotH - (mg / maxMg) * plotH;
 
-      const styles = getComputedStyle(document.documentElement);
-      const primary = styles.getPropertyValue('--c-primary').trim() || '#7c4dff';
-      const warn = styles.getPropertyValue('--c-warn').trim() || '#e53935';
-      const accent = styles.getPropertyValue('--c-accent').trim() || '#22c55e';
-      const muted = styles.getPropertyValue('--text-color-muted').trim() || '#888';
+      const primary = themeColor('--c-primary', '#7c4dff');
+      const warn = themeColor('--c-warn', '#e53935');
+      const accent = themeColor('--c-accent', '#22c55e');
 
       const untilBelow = timeUntilBelow(state.threshold);
       const crossMs = untilBelow !== null && untilBelow > 0 ? now + untilBelow : null;
@@ -2074,22 +2180,7 @@
         ctx.setLineDash([]);
       }
 
-      ctx.strokeStyle = primary;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      tracePath(ctx, points, xOf, yOf, true);
-      ctx.stroke();
-
-      const fillGradient = ctx.createLinearGradient(0, padT, 0, padT + plotH);
-      fillGradient.addColorStop(0, toRgba(primary, 0.4));
-      fillGradient.addColorStop(1, toRgba(primary, 0));
-      ctx.fillStyle = fillGradient;
-      ctx.beginPath();
-      tracePath(ctx, points, xOf, yOf, true);
-      ctx.lineTo(xOf(points[points.length - 1][0]), padT + plotH);
-      ctx.lineTo(xOf(points[0][0]), padT + plotH);
-      ctx.closePath();
-      ctx.fill();
+      drawCurveFill(ctx, points, xOf, yOf, padT, plotH, primary, 2, 0.4);
 
       const nowLevel = levelAt(now);
       ctx.fillStyle = primary;
@@ -2111,7 +2202,7 @@
       nowLine.style.top = `${padT}px`;
       nowLine.style.height = `${plotH}px`;
 
-      drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, taskData, '#f59e0b', 'taskPulseDot', 'chartTasksStat', 'tasks done today');
+      drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, taskData, '#f59e0b', 'taskPulseDot', 'chartTasksStat', 'tasks done today', -2, true);
       drawRemainingLine(ctx, xOf, padT, plotH, startMs, endMs, habitData, '#22c55e', 'habitPulseDot', 'chartHabitsStat', 'habits done today');
 
       if (showCrossing) {
@@ -2149,9 +2240,6 @@
       }));
     }
 
-    // Shared canvas setup for the small report charts (drawBarChart,
-    // drawDualBarChart, drawSignedBarChart): sizes the backing store for
-    // devicePixelRatio, resets the transform, and clears it.
     function setupChartCanvas(canvasId, h) {
       const canvas = document.getElementById(canvasId);
       const dpr = window.devicePixelRatio || 1;
@@ -2165,21 +2253,23 @@
       return { ctx, w, h };
     }
 
+    function barLayout(count, w, h) {
+      const padL = 2;
+      const padT = 8;
+      const plotW = w - 4;
+      const plotH = h - padT - 14;
+      const gap = 4;
+      const barW = Math.max((plotW - gap * (count - 1)) / count, 2);
+      return { padL, padT, plotH, gap, barW };
+    }
+
     function drawBarChart(canvasId, bars, color) {
       const { ctx, w, h } = setupChartCanvas(canvasId, 110);
       if (bars.length === 0) return;
 
-      const padL = 2;
-      const padR = 2;
-      const padT = 8;
-      const padB = 14;
-      const plotW = w - padL - padR;
-      const plotH = h - padT - padB;
+      const { padL, padT, plotH, gap, barW } = barLayout(bars.length, w, h);
       const maxVal = Math.max(...bars.map((b) => b.value), 0.0001);
-      const gap = 4;
-      const barW = Math.max((plotW - gap * (bars.length - 1)) / bars.length, 2);
-
-      const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-color-muted').trim() || '#888';
+      const muted = themeColor('--text-color-muted', '#888');
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
 
@@ -2224,26 +2314,18 @@
       const { ctx, w, h } = setupChartCanvas(canvasId, 110);
       if (bars.length === 0) return;
 
-      const padL = 2;
-      const padR = 2;
-      const padT = 8;
-      const padB = 14;
-      const plotW = w - padL - padR;
-      const plotH = h - padT - padB;
+      const { padL, padT, plotH, gap, barW } = barLayout(bars.length, w, h);
       const maxAbs = Math.max(...bars.map((b) => Math.abs(b.value)), 1);
       const zeroY = padT + plotH / 2;
-      const gap = 4;
-      const barW = Math.max((plotW - gap * (bars.length - 1)) / bars.length, 2);
 
-      const styles = getComputedStyle(document.documentElement);
-      const muted = styles.getPropertyValue('--text-color-muted').trim() || '#888';
-      const divider = styles.getPropertyValue('--divider-color').trim() || '#ccc';
+      const muted = themeColor('--text-color-muted', '#888');
+      const divider = themeColor('--divider-color', '#ccc');
 
       ctx.strokeStyle = divider;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(padL, zeroY);
-      ctx.lineTo(w - padR, zeroY);
+      ctx.lineTo(w - 2, zeroY);
       ctx.stroke();
 
       ctx.font = '9px sans-serif';
@@ -2259,9 +2341,129 @@
       });
     }
 
+    function drawDayPanel(canvasId, dayStartMs, dayEndMs, taskBucket, habitBucket, isToday) {
+      const { ctx, w, h } = setupChartCanvas(canvasId, 90);
+      const stepMs = 15 * 60000;
+      const points = [];
+      let maxMg = state.threshold;
+      for (let t = dayStartMs; t <= dayEndMs; t += stepMs) {
+        const lvl = levelAt(t);
+        points.push([t, lvl]);
+        if (lvl > maxMg) maxMg = lvl;
+      }
+      maxMg *= 1.15;
+
+      const padL = 2;
+      const padR = 2;
+      const padT = 6;
+      const padB = 6;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+      const xOf = (t) => padL + ((t - dayStartMs) / (dayEndMs - dayStartMs)) * plotW;
+      const yOf = (mg) => padT + plotH - (mg / maxMg) * plotH;
+
+      const primary = themeColor('--c-primary', '#7c4dff');
+      const warn = themeColor('--c-warn', '#e53935');
+
+      const sleepEntry = state.sleepEntries.find((se) => se.dayKey === dateKeyLocal(dayStartMs));
+      if (sleepEntry) {
+        const s = Math.max(sleepEntry.time - sleepEntry.durationMin * 60000, dayStartMs);
+        const t = Math.min(sleepEntry.time, dayEndMs);
+        if (t > s) {
+          ctx.fillStyle = toRgba(warn, 0.14);
+          ctx.fillRect(xOf(s), padT, xOf(t) - xOf(s), plotH);
+        }
+      }
+
+      ctx.strokeStyle = warn;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padL, yOf(state.threshold));
+      ctx.lineTo(w - padR, yOf(state.threshold));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      drawCurveFill(ctx, points, xOf, yOf, padT, plotH, primary, 1.5, 0.35);
+
+      const taskSeriesData = taskBucket
+        ? { total: taskBucket.total, completions: taskBucket.doneTimes.map((time) => ({ time })) }
+        : { total: 0, completions: [] };
+      drawStepOverlay(ctx, xOf, padT, plotH, dayStartMs, dayEndMs, taskSeriesData, '#f59e0b', -2, true);
+
+      if (isToday && habitData.total > 0) {
+        drawStepOverlay(ctx, xOf, padT, plotH, dayStartMs, dayEndMs, habitData, '#22c55e');
+      } else if (habitBucket && habitBucket.total > 0) {
+        const data = {
+          total: habitBucket.total,
+          completions: Object.values(habitBucket.marks)
+            .sort((a, b) => a - b)
+            .map((time) => ({ time })),
+        };
+        drawStepOverlay(ctx, xOf, padT, plotH, dayStartMs, dayEndMs, data, '#22c55e');
+      }
+    }
+
+    function renderDailyBreakdown() {
+      const container = document.getElementById('dailyBreakdownList');
+      const days = Math.min(Math.max(parseInt(state.dailyBreakdownDays, 10) || 7, 1), 30);
+      const now = Date.now();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      container.innerHTML = '';
+      const panels = [];
+      for (let i = 0; i < days; i++) {
+        const dayStart = new Date(todayStart);
+        dayStart.setDate(dayStart.getDate() - i);
+        const dayStartMs = dayStart.getTime();
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        const dayEndMs = dayEnd.getTime();
+        const dayKey = dateKeyLocal(dayStartMs);
+        const label = i === 0 ? 'Today' : new Date(dayStartMs).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        const dayTotalMg = state.entries.filter((e) => e.time >= dayStartMs && e.time < dayEndMs).reduce((sum, e) => sum + e.mg, 0);
+        const taskBucket = taskHistory.dayBuckets.get(dayKey);
+        const habitBucket = i === 0 ? null : state.habitDayHistory && state.habitDayHistory[dayKey];
+
+        const statParts = [`${Math.round(dayTotalMg)} mg`];
+        if (taskBucket && taskBucket.total > 0) {
+          const done = taskBucket.doneTimes.length;
+          statParts.push(`${done} task${done === 1 ? '' : 's'}`);
+          statParts.push(`${Math.round((done / taskBucket.total) * 100)}%`);
+        }
+        if (i === 0 && habitData.total > 0) {
+          statParts.push(`${habitData.completions.length}/${habitData.total} habits`);
+        } else if (habitBucket && habitBucket.total > 0) {
+          statParts.push(`${Object.keys(habitBucket.marks).length}/${habitBucket.total} habits`);
+        }
+
+        const block = document.createElement('div');
+        block.className = 'daily-breakdown-day';
+        const title = document.createElement('div');
+        title.className = 'daily-breakdown-title';
+        title.innerHTML = `<span></span><span></span>`;
+        title.children[0].textContent = label;
+        title.children[1].textContent = statParts.join(' - ');
+        const canvas = document.createElement('canvas');
+        const canvasId = `dailyBreakdownCanvas-${i}`;
+        canvas.id = canvasId;
+        canvas.className = 'daily-breakdown-canvas';
+        block.appendChild(title);
+        block.appendChild(canvas);
+        container.appendChild(block);
+
+        panels.push({ canvasId, dayStartMs, dayEndMs, dayKey, isToday: i === 0 });
+      }
+
+      for (const panel of panels) {
+        const taskBucket = taskHistory.dayBuckets.get(panel.dayKey);
+        const habitBucket = state.habitDayHistory && state.habitDayHistory[panel.dayKey];
+        drawDayPanel(panel.canvasId, panel.dayStartMs, panel.dayEndMs, taskBucket, habitBucket, panel.isToday);
+      }
+    }
+
     function renderImpact() {
-      // Shared between the two level-bucketed rate charts below — each used
-      // to compute this expensive (~19,200-step) scan independently.
       const exposureHours = buildLevelExposureHours();
       const rateData = buildCompletionRateByLevel(exposureHours);
       const rateNote = document.getElementById('levelRateNote');
@@ -2269,11 +2471,7 @@
         rateData.length === 0
           ? 'Not enough data yet — log drinks and complete tasks to build this up.'
           : `Task completions per hour of exposure to each caffeine level (${taskHistory.completions.length} completions tracked).`;
-      drawBarChart(
-        'levelRateChart',
-        rateData.map((r) => ({ label: r.label, value: r.rate })),
-        '#f59e0b',
-      );
+      drawBarChart('levelRateChart', rateData.map((r) => ({ label: r.label, value: r.rate })), '#f59e0b');
 
       const trackedRows = buildDailyTrackedVsCaffeine();
       const trackedNote = document.getElementById('dailyTrackedNote');
@@ -2281,14 +2479,7 @@
         trackedRows.length === 0
           ? 'Not enough data yet — needs days with both logged caffeine and tracked time.'
           : `Last ${trackedRows.length} day${trackedRows.length === 1 ? '' : 's'} with data, oldest to newest.`;
-      drawDualBarChart(
-        'dailyTrackedChart',
-        trackedRows,
-        (r) => r.mg,
-        (r) => r.trackedMin,
-        '#7c4dff',
-        '#22c55e',
-      );
+      drawDualBarChart('dailyTrackedChart', trackedRows, (r) => r.mg, (r) => r.trackedMin, '#7c4dff', '#22c55e');
 
       const accuracyData = buildEstimateAccuracyByLevel();
       const accuracyNote = document.getElementById('estimateAccuracyNote');
@@ -2296,12 +2487,7 @@
         accuracyData.length === 0
           ? 'Not enough data yet — needs tasks with a time estimate set.'
           : 'Avg. % over (amber) or under (green) your time estimate, by caffeine level.';
-      drawSignedBarChart(
-        'estimateAccuracyChart',
-        accuracyData.map((r) => ({ label: r.label, value: r.avgPctError })),
-        '#f59e0b',
-        '#22c55e',
-      );
+      drawSignedBarChart('estimateAccuracyChart', accuracyData.map((r) => ({ label: r.label, value: r.avgPctError })), '#f59e0b', '#22c55e');
 
       const hourData = buildCompletionsByHour();
       const hourNote = document.getElementById('hourHeatmapNote');
@@ -2323,9 +2509,6 @@
       for (const r of tagRows) {
         const row = document.createElement('div');
         row.className = 'history-row';
-        // createElement/textContent — r.topLabel is a tag title from SP's
-        // own getAllTags(), user-editable text, not safe to interpolate
-        // into innerHTML.
         const main = document.createElement('span');
         main.textContent = `${r.label} mg `;
         const meta = document.createElement('span');
@@ -2336,41 +2519,6 @@
         tagList.appendChild(row);
       }
 
-      const focusData = buildFocusSessionLengthByLevel();
-      const focusNote = document.getElementById('focusSessionNote');
-      focusNote.textContent =
-        focusData.length === 0
-          ? 'Not enough data yet (this session only) — switch tasks a few times to build this up.'
-          : 'Avg. focus-session length by caffeine level (this session only).';
-      drawBarChart(
-        'focusSessionChart',
-        focusData.map((r) => ({ label: r.label, value: r.avgMin })),
-        '#a855f7',
-      );
-
-      const creationData = buildTaskCreationRateByLevel(exposureHours);
-      const creationNote = document.getElementById('taskCreationNote');
-      creationNote.textContent =
-        creationData.length === 0
-          ? 'Not enough data yet — log drinks and create tasks to build this up.'
-          : `New tasks created per hour of exposure to each caffeine level (${taskHistory.creations.length} tasks tracked).`;
-      drawBarChart(
-        'taskCreationChart',
-        creationData.map((r) => ({ label: r.label, value: r.rate })),
-        '#ec4899',
-      );
-
-      const deadlineRows = buildCaffeineByDeadlineProximity();
-      const deadlineNote = document.getElementById('deadlineProximityNote');
-      deadlineNote.textContent =
-        deadlineRows.length === 0
-          ? 'Not enough data yet — needs tasks with a deadline set.'
-          : 'Avg. daily mg by how close the nearest deadline was that day.';
-      drawBarChart(
-        'deadlineProximityChart',
-        deadlineRows.map((r) => ({ label: r.label, value: r.avgMg })),
-        '#eab308',
-      );
     }
 
     let summaryPeriod = 'day';
@@ -2483,9 +2631,6 @@
             : '';
         const topLabel = mostCommonDrink(r.byDrink);
         const topNote = topLabel ? ` · ${drinkEmoji(topLabel)} ${topLabel} most common`.replace('  ', ' ') : '';
-        // createElement/textContent — topLabel is a synced drink name, not
-        // safe to interpolate into innerHTML (same reasoning as the
-        // quick-add/history-row fixes above).
         const main = document.createElement('span');
         main.textContent = `${periodLabel(r.key, summaryPeriod)} `;
         const meta = document.createElement('span');
@@ -2503,19 +2648,16 @@
       return String(s).replace(/\|/g, '\\|').replace(/"/g, "'");
     }
 
-    // Builds one mermaid xychart-beta fenced block. `values` can hold
-    // numbers or pre-formatted strings (e.g. `.toFixed(2)`) — both join
-    // fine for the bar list. Shared by every bar chart in the export.
-    function mdBarChart(title, labels, values, yLabel, yMin, yMax) {
-      return (
-        '```mermaid\n' +
-        `xychart-beta\n` +
-        `    title "${escapeMd(title)}"\n` +
-        `    x-axis [${labels.map((l) => `"${escapeMd(l)}"`).join(', ')}]\n` +
-        `    y-axis "${yLabel}" ${yMin} --> ${yMax}\n` +
-        `    bar [${values.join(', ')}]\n` +
-        '```\n'
-      );
+    function mdBarChart(title, labels, values, yLabel, yMin, yMax, kind = 'bar') {
+      const series = Array.isArray(values[0]) ? values : [values];
+      const axisLabels = labels.map((l) => `"${escapeMd(l)}"`).join(', ');
+      let out = '```mermaid\nxychart-beta\n' + `    title "${escapeMd(title)}"\n    x-axis [${axisLabels}]\n    y-axis "${yLabel}" ${yMin} --> ${yMax}\n`;
+      for (const v of series) out += `    ${kind} [${v.join(', ')}]\n`;
+      return out + '```\n';
+    }
+
+    function remainingAtTime(data, t) {
+      return Math.max(data.total - data.completions.filter((c) => c.time <= t).length, 0);
     }
 
     function buildExportMarkdown() {
@@ -2538,16 +2680,34 @@
 
       if (rows.length > 0) {
         const maxVal = Math.max(...rows.map((r) => r.totalMg), state.threshold) * 1.15;
-        md += mdBarChart(
-          `${periodTitle} caffeine intake (mg)`,
-          rows.map((r) => periodLabel(r.key, summaryPeriod)),
-          rows.map((r) => Math.round(r.totalMg)),
-          'mg',
-          0,
-          Math.round(maxVal),
-        );
+        md += mdBarChart(`${periodTitle} caffeine intake (mg)`, rows.map((r) => periodLabel(r.key, summaryPeriod)), rows.map((r) => Math.round(r.totalMg)), 'mg', 0, Math.round(maxVal));
         md += '\n';
       }
+
+      const nowMs = now.getTime();
+      const decayStartMs = nowMs - state.chartHoursBefore * 3600000;
+      const decayEndMs = nowMs + state.chartHoursAfter * 3600000;
+      const decayLabels = [];
+      const decayLevels = [];
+      for (let t = decayStartMs; t <= decayEndMs; t += 3600000) {
+        decayLabels.push(fmtChartLabel(t, nowMs));
+        decayLevels.push(Math.round(levelAt(t)));
+      }
+      const remSeries = (data) => decayLabels.map((_, i) => remainingAtTime(data, decayStartMs + i * 3600000));
+      const mgYMax = Math.round(Math.max(...decayLevels, state.threshold) * 1.15);
+      const decaySeries = [decayLevels];
+      let decayLegend = 'Line 1 = mg';
+      if (taskData.total > 0) {
+        decaySeries.push(remSeries(taskData).map((n) => Math.round((n / taskData.total) * mgYMax)));
+        decayLegend += `, ${decaySeries.length} = tasks left (of ${taskData.total}, scaled)`;
+      }
+      if (habitData.total > 0) {
+        decaySeries.push(remSeries(habitData).map((n) => Math.round((n / habitData.total) * mgYMax)));
+        decayLegend += `, ${decaySeries.length} = habits left (of ${habitData.total}, scaled)`;
+      }
+      md += `\n## Decay curve (past ${state.chartHoursBefore}h - next ${state.chartHoursAfter}h)\n\n`;
+      md += `${decayLegend}\n\n`;
+      md += mdBarChart('Caffeine (mg) with task/habit burndown', decayLabels, decaySeries, 'mg', 0, mgYMax, 'line');
 
       const byDrink = new Map();
       for (const e of state.entries) {
@@ -2582,14 +2742,7 @@
           md += `| ${r.label} | ${r.rate.toFixed(2)} | ${r.count} | ${Math.round(r.hours)} |\n`;
         }
         md += `\n`;
-        md += mdBarChart(
-          'Completions per hour by caffeine level (mg)',
-          rateData.map((r) => r.label),
-          rateData.map((r) => r.rate.toFixed(2)),
-          'completions/hour',
-          0,
-          Math.round(Math.max(...rateData.map((r) => r.rate)) * 1.15 * 100) / 100 || 1,
-        );
+        md += mdBarChart('Completions per hour by caffeine level (mg)', rateData.map((r) => r.label), rateData.map((r) => r.rate.toFixed(2)), 'completions/hour', 0, Math.round(Math.max(...rateData.map((r) => r.rate)) * 1.15 * 100) / 100 || 1);
       }
 
       const trackedRows = buildDailyTrackedVsCaffeine();
@@ -2600,23 +2753,9 @@
           md += `| ${escapeMd(r.key)} | ${Math.round(r.mg)} | ${r.trackedMin} |\n`;
         }
         md += `\n`;
-        md += mdBarChart(
-          'Daily caffeine (mg)',
-          trackedRows.map((r) => r.key),
-          trackedRows.map((r) => Math.round(r.mg)),
-          'mg',
-          0,
-          Math.round(Math.max(...trackedRows.map((r) => r.mg)) * 1.15) || 1,
-        );
+        md += mdBarChart('Daily caffeine (mg)', trackedRows.map((r) => r.key), trackedRows.map((r) => Math.round(r.mg)), 'mg', 0, Math.round(Math.max(...trackedRows.map((r) => r.mg)) * 1.15) || 1);
         md += '\n';
-        md += mdBarChart(
-          'Daily time tracked (min)',
-          trackedRows.map((r) => r.key),
-          trackedRows.map((r) => r.trackedMin),
-          'min',
-          0,
-          Math.round(Math.max(...trackedRows.map((r) => r.trackedMin)) * 1.15) || 1,
-        );
+        md += mdBarChart('Daily time tracked (min)', trackedRows.map((r) => r.key), trackedRows.map((r) => r.trackedMin), 'min', 0, Math.round(Math.max(...trackedRows.map((r) => r.trackedMin)) * 1.15) || 1);
       }
 
       const accuracyData = buildEstimateAccuracyByLevel();
@@ -2629,14 +2768,7 @@
         }
         md += `\n`;
         const maxAbs = Math.max(...accuracyData.map((r) => Math.abs(r.avgPctError)), 1) * 1.15;
-        md += mdBarChart(
-          'Estimate accuracy by caffeine level (% over/under)',
-          accuracyData.map((r) => r.label),
-          accuracyData.map((r) => r.avgPctError.toFixed(1)),
-          '% over/under',
-          Math.round(-maxAbs),
-          Math.round(maxAbs),
-        );
+        md += mdBarChart('Estimate accuracy by caffeine level (% over/under)', accuracyData.map((r) => r.label), accuracyData.map((r) => r.avgPctError.toFixed(1)), '% over/under', Math.round(-maxAbs), Math.round(maxAbs));
       }
 
       const hourData = buildCompletionsByHour().map((b, hour) => ({ label: `${hour}h`, value: b.value }));
@@ -2648,14 +2780,7 @@
           if (b.value > 0) md += `| ${b.label} | ${b.value} |\n`;
         }
         md += `\n`;
-        md += mdBarChart(
-          'Task completions by hour of day',
-          hourData.map((b) => b.label),
-          hourData.map((b) => b.value),
-          'completions',
-          0,
-          Math.round(Math.max(...hourData.map((b) => b.value)) * 1.15) || 1,
-        );
+        md += mdBarChart('Task completions by hour of day', hourData.map((b) => b.label), hourData.map((b) => b.value), 'completions', 0, Math.round(Math.max(...hourData.map((b) => b.value)) * 1.15) || 1);
       }
 
       const tagRows = buildTopTagByLevel();
@@ -2668,61 +2793,12 @@
         md += `\n`;
       }
 
-      const focusRows = buildFocusSessionLengthByLevel();
-      if (focusRows.length > 0) {
-        md += `\n## Focus-session length by caffeine level (this session only)\n\n`;
-        md += `Session-local data — resets on plugin reload, no history across app restarts.\n\n`;
-        md += `| Caffeine level (mg) | Avg. session length (min) | Sessions |\n|---|---|---|\n`;
-        for (const r of focusRows) {
-          md += `| ${r.label} | ${Math.round(r.avgMin)} | ${r.count} |\n`;
+      if (state.sleepEntries.length > 0) {
+        md += `\n## Sleep log\n\n`;
+        md += `| Date | Duration | Rating |\n|---|---|---|\n`;
+        for (const e of [...state.sleepEntries].sort((a, b) => b.dayKey.localeCompare(a.dayKey))) {
+          md += `| ${e.dayKey} | ${fmtDuration(e.durationMin * 60000)} | ${starString(e.rating || 0)} |\n`;
         }
-        md += `\n`;
-        md += mdBarChart(
-          'Focus-session length by caffeine level (min, this session only)',
-          focusRows.map((r) => r.label),
-          focusRows.map((r) => Math.round(r.avgMin)),
-          'min',
-          0,
-          Math.round(Math.max(...focusRows.map((r) => r.avgMin)) * 1.15) || 1,
-        );
-      }
-
-      const creationRows = buildTaskCreationRateByLevel(exportExposureHours);
-      if (creationRows.length > 0) {
-        md += `\n## Task creation rate by caffeine level\n\n`;
-        md += `New tasks per hour of exposure to each level, from ${taskHistory.creations.length} tracked task creations.\n\n`;
-        md += `| Caffeine level (mg) | New tasks/hour | Tasks created |\n|---|---|---|\n`;
-        for (const r of creationRows) {
-          md += `| ${r.label} | ${r.rate.toFixed(2)} | ${r.count} |\n`;
-        }
-        md += `\n`;
-        md += mdBarChart(
-          'New tasks per hour by caffeine level (mg)',
-          creationRows.map((r) => r.label),
-          creationRows.map((r) => r.rate.toFixed(2)),
-          'tasks/hour',
-          0,
-          Math.round(Math.max(...creationRows.map((r) => r.rate)) * 1.15 * 100) / 100 || 1,
-        );
-      }
-
-      const deadlineRows = buildCaffeineByDeadlineProximity();
-      if (deadlineRows.length > 0) {
-        md += `\n## Caffeine by deadline proximity\n\n`;
-        md += `Avg. daily mg on days with a deadline this close, vs. days with nothing looming.\n\n`;
-        md += `| Deadline proximity | Avg. mg/day | Days |\n|---|---|---|\n`;
-        for (const r of deadlineRows) {
-          md += `| ${r.label} | ${Math.round(r.avgMg)} | ${r.days} |\n`;
-        }
-        md += `\n`;
-        md += mdBarChart(
-          'Avg. daily caffeine by deadline proximity (mg)',
-          deadlineRows.map((r) => r.label),
-          deadlineRows.map((r) => Math.round(r.avgMg)),
-          'mg',
-          0,
-          Math.round(Math.max(...deadlineRows.map((r) => r.avgMg)) * 1.15) || 1,
-        );
       }
 
       return md;
@@ -2749,7 +2825,7 @@
             await win.navigator.share({ files: [file], title: 'Caffeine Tracker Report' });
             return;
           } catch (e) {
-            if (e && e.name === 'AbortError') return; // user dismissed the share sheet
+            if (e && e.name === 'AbortError') return;
           }
         }
       }
@@ -2768,6 +2844,9 @@
     function renderSettings() {
       document.getElementById('halfLifeInput').value = state.halfLifeHours;
       document.getElementById('thresholdInput').value = state.threshold;
+      document.getElementById('breakdownDaysInput').value = state.dailyBreakdownDays;
+      document.getElementById('chartHoursBeforeInput').value = state.chartHoursBefore;
+      document.getElementById('chartHoursAfterInput').value = state.chartHoursAfter;
       renderManageDrinks();
     }
 
@@ -2778,6 +2857,30 @@
       renderChart();
       renderSummary();
     }
+
+    document.querySelectorAll('#sleepRatingInput button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const star = Number(btn.dataset.star);
+        sleepRatingValue = sleepRatingValue === star ? star - 1 : star;
+        renderSleepRatingInput();
+      });
+    });
+
+    document.getElementById('sleepAddBtn').addEventListener('click', () => {
+      const hoursEl = document.getElementById('sleepHoursInput');
+      const minsEl = document.getElementById('sleepMinsInput');
+      const durationMin = (parseFloat(hoursEl.value) || 0) * 60 + (parseFloat(minsEl.value) || 0);
+      if (durationMin <= 0) {
+        p.showSnack?.({ msg: 'Enter a sleep duration', type: 'ERROR' });
+        return;
+      }
+      addSleepEntry(durationMin, sleepRatingValue);
+      hoursEl.value = '';
+      minsEl.value = '';
+      sleepRatingValue = 0;
+      renderSleepRatingInput();
+      p.showSnack?.({ msg: `Logged ${fmtDuration(durationMin * 60000)} of sleep`, type: 'SUCCESS' });
+    });
 
     document.getElementById('customAddBtn').addEventListener('click', () => {
       const nameEl = document.getElementById('customName');
@@ -2795,6 +2898,16 @@
 
     bindNumberSetting('halfLifeInput', 'halfLifeHours', 2, 10);
     bindNumberSetting('thresholdInput', 'threshold', 0, 400);
+    bindNumberSetting('chartHoursBeforeInput', 'chartHoursBefore', 1, 48);
+    bindNumberSetting('chartHoursAfterInput', 'chartHoursAfter', 1, 48);
+
+    document.getElementById('breakdownDaysInput').addEventListener('change', (ev) => {
+      const val = parseInt(ev.target.value, 10);
+      if (val >= 1 && val <= 30) {
+        state.dailyBreakdownDays = val;
+        save();
+      }
+    });
 
     const newDrinkEmojiBtn = document.getElementById('newDrinkEmojiBtn');
     newDrinkEmojiBtn.addEventListener('click', () =>
@@ -2845,7 +2958,6 @@
     p.registerHook?.(p.Hooks.ACTION, (payload) => {
       if (payload?.action && payload.action.includes('SimpleCounter')) refreshHabits();
     });
-    p.registerHook?.(p.Hooks.CURRENT_TASK_CHANGE, onCurrentTaskChange);
 
     p.onReady(async () => {
       renderQuickAdd();
