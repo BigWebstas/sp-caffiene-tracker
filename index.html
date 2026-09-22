@@ -221,7 +221,7 @@
 
   .gauge-stats {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     margin-top: var(--s2);
   }
 
@@ -232,7 +232,8 @@
   }
 
   .gauge-stat .stat-label,
-  .quick-add .drink-mg {
+  .quick-add .drink-mg,
+  .drink-row-labels {
     font-size: 11px;
     color: var(--text-color-muted);
   }
@@ -243,6 +244,7 @@
   }
 
   .gauge-stat.container .stat-value,
+  .gauge-stat.sipTime .stat-value,
   .section-title-row .daily-total {
     color: var(--c-primary);
   }
@@ -557,8 +559,6 @@
 
   .drink-row-labels {
     padding-bottom: var(--s-half);
-    font-size: 11px;
-    color: var(--text-color-muted);
   }
 
   .section-title {
@@ -710,6 +710,10 @@
       <div class="gauge-stat container">
         <span class="stat-label">Left in cup</span>
         <span class="stat-value" id="containerStat">None in progress</span>
+      </div>
+      <div class="gauge-stat sipTime">
+        <span class="stat-label">Sip time left</span>
+        <span class="stat-value" id="sipTimeStat">—</span>
       </div>
       <div class="gauge-stat metabolized">
         <span class="stat-label">Metabolized</span>
@@ -907,7 +911,7 @@
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.41.2';
+    const CURRENT_VERSION = '1.44.2';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1073,10 +1077,10 @@
 
     function entryLevelAt(e, tsMs) {
       const H = state.halfLifeHours * 3600000;
-      const t0 = e.time;
+      const D = (e.drinkTimeMin || 0) * 60000;
+      const t0 = D > 0 ? e.rampStart ?? e.time : e.time;
       if (tsMs < t0) return 0;
 
-      const D = (e.drinkTimeMin || 0) * 60000;
       if (D <= 0) {
         return e.mg * Math.pow(2, (t0 - tsMs) / H);
       }
@@ -1085,6 +1089,17 @@
       const rate = e.mg / D;
       const k = Math.LN2 / H;
       return (rate / k) * (Math.pow(2, (u - tsMs) / H) - Math.pow(2, (t0 - tsMs) / H));
+    }
+
+    function cupBusyUntil(nowMs) {
+      let latest = nowMs;
+      for (const e of state.entries) {
+        const D = (e.drinkTimeMin || 0) * 60000;
+        if (D <= 0) continue;
+        const end = (e.rampStart ?? e.time) + D;
+        if (end > latest) latest = end;
+      }
+      return latest;
     }
 
     function levelAt(tsMs) {
@@ -1101,7 +1116,7 @@
       for (const e of state.entries) {
         const D = (e.drinkTimeMin || 0) * 60000;
         if (D <= 0) continue;
-        const elapsed = tsMs - e.time;
+        const elapsed = tsMs - (e.rampStart ?? e.time);
         if (elapsed >= D) continue;
         const consumedFrac = Math.max(elapsed, 0) / D;
         totalMg += e.mg;
@@ -1265,12 +1280,15 @@
     }
 
     function addEntry(label, mg, drinkTimeMin = 0) {
+      const now = Date.now();
+      const rampStart = drinkTimeMin > 0 ? cupBusyUntil(now) : now;
       state.entries.push({
         id: newId(),
         label,
         mg,
         drinkTimeMin,
-        time: Date.now(),
+        time: now,
+        rampStart,
       });
       save();
       renderAll();
@@ -1325,9 +1343,13 @@
     function renderSleepHistory() {
       const wrap = document.getElementById('sleepHistory');
       wrap.innerHTML = '';
-      const rows = [...state.sleepEntries].sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+      const days = Math.min(Math.max(parseInt(state.dailyBreakdownDays, 10) || 7, 1), 30);
+      const cutoffMs = new Date().setHours(0, 0, 0, 0) - (days - 1) * 24 * 3600000;
+      const rows = state.sleepEntries
+        .filter((e) => e.time >= cutoffMs)
+        .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
       if (rows.length === 0) {
-        wrap.innerHTML = '<div class="empty-state">No sleep logged yet</div>';
+        wrap.innerHTML = `<div class="empty-state">No sleep logged in the last ${days} days</div>`;
         return;
       }
       for (const e of rows) {
@@ -1484,16 +1506,7 @@
     }
 
     function drawGauge(remaining, totalDosed) {
-      const canvas = document.getElementById('gauge');
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(rect.width, 160);
-      const h = 130;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
+      const { ctx, w, h } = setupChartCanvas('gauge', 130, 160);
 
       const metabolized = Math.max(totalDosed - remaining, 0);
       const remainingFrac = totalDosed > 0 ? Math.min(remaining / totalDosed, 1) : 0;
@@ -1536,13 +1549,17 @@
       const metabolizedPct = totalDosed > 0 ? Math.max(100 - remainingPct, 0) : 0;
       document.getElementById('metabolizedStat').textContent = `${Math.round(metabolized)} mg · ${metabolizedPct}%`;
 
-      const { totalMg: cupTotal, leftMg: cupLeft } = containerStatus(Date.now());
+      const nowMs = Date.now();
+      const { totalMg: cupTotal, leftMg: cupLeft } = containerStatus(nowMs);
       const containerStat = document.getElementById('containerStat');
+      const sipTimeStat = document.getElementById('sipTimeStat');
       if (cupTotal > 0) {
         const cupPct = Math.round((cupLeft / cupTotal) * 100);
         containerStat.textContent = `${Math.round(cupLeft)} mg · ${cupPct}%`;
+        sipTimeStat.textContent = fmtDuration(Math.max(cupBusyUntil(nowMs) - nowMs, 0));
       } else {
         containerStat.textContent = 'None in progress';
+        sipTimeStat.textContent = '—';
       }
     }
 
@@ -1813,11 +1830,12 @@
         if (t.isDone && t.doneOn && t.timeEstimate > 0 && t.timeSpent > 0) {
           estimateSamples.push({ time: t.doneOn, estimate: t.timeEstimate, spent: t.timeSpent });
         }
-        if (t.created) creations.push({ time: t.created });
-        if (t.deadlineDay) deadlineDaysMs.push(dayKeyToMs(t.deadlineDay));
-        else if (t.deadlineWithTime) deadlineDaysMs.push(dayKeyToMs(dateKeyLocal(t.deadlineWithTime)));
 
-        const dueDayKey = t.dueDay || (t.dueWithTime ? dateKeyLocal(t.dueWithTime) : null);
+        // SP clears dueDay/dueWithTime on archive, so fall back to the completion day.
+        const dueDayKey =
+          t.dueDay ||
+          (t.dueWithTime ? dateKeyLocal(t.dueWithTime) : null) ||
+          (t.isDone && t.doneOn ? dateKeyLocal(t.doneOn) : null);
         if (dueDayKey) {
           let bucket = dayBuckets.get(dueDayKey);
           if (!bucket) {
@@ -1829,9 +1847,8 @@
         }
       }
       allCompletions.sort((a, b) => a.time - b.time);
-      creations.sort((a, b) => a.time - b.time);
       for (const bucket of dayBuckets.values()) bucket.doneTimes.sort((a, b) => a - b);
-      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples, creations, deadlineDaysMs, dayBuckets };
+      taskHistory = { completions: allCompletions, dailyTrackedMs, estimateSamples, dayBuckets };
 
       renderChart();
       renderImpact();
@@ -2113,16 +2130,7 @@
     }
 
     function renderChart() {
-      const canvas = document.getElementById('chart');
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(rect.width, 200);
-      const h = 160;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
+      const { ctx, w, h } = setupChartCanvas('chart', 160);
 
       const now = Date.now();
       const startMs = now - state.chartHoursBefore * 3600000;
@@ -2240,11 +2248,11 @@
       }));
     }
 
-    function setupChartCanvas(canvasId, h) {
+    function setupChartCanvas(canvasId, h, minW = 200) {
       const canvas = document.getElementById(canvasId);
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
-      const w = Math.max(rect.width, 200);
+      const w = Math.max(rect.width, minW);
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       const ctx = canvas.getContext('2d');
@@ -2956,7 +2964,8 @@
     p.registerHook?.(p.Hooks.PERSISTED_DATA_CHANGED, load);
     p.registerHook?.(p.Hooks.ANY_TASK_UPDATE, refreshTasks);
     p.registerHook?.(p.Hooks.ACTION, (payload) => {
-      if (payload?.action && payload.action.includes('SimpleCounter')) refreshHabits();
+      const at = typeof payload?.action === 'string' ? payload.action : payload?.action?.type;
+      if (at?.includes('SimpleCounter')) refreshHabits();
     });
 
     p.onReady(async () => {
