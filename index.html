@@ -302,14 +302,60 @@
     flex-wrap: wrap;
   }
 
-  .prior-sleep-form input[type="date"] {
+  .prior-sleep-form #priorSleepDateInput {
     flex: 1;
     min-width: 130px;
-    color-scheme: light;
+    cursor: pointer;
   }
 
-  .prior-sleep-form input[type="date"]::-webkit-calendar-picker-indicator {
+  .cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: var(--s-half);
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 30px);
+    gap: 2px;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .cal-grid span {
+    color: var(--text-color-muted);
+    font-size: 10px;
+  }
+
+  .cal-popover button {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-color);
+    height: 28px;
+    padding: 0;
     cursor: pointer;
+  }
+
+  .cal-popover button:hover:not(:disabled) {
+    background: var(--divider-color);
+  }
+
+  .cal-popover button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .cal-grid button.today {
+    border-color: var(--c-primary);
+  }
+
+  .cal-grid button.sel {
+    background: var(--c-primary);
+    color: #fff;
   }
 
   .prior-sleep-form .star-rating {
@@ -921,7 +967,7 @@
 
         <div class="section-title">Log sleep for previous day</div>
         <div class="card sleep-form prior-sleep-form">
-          <input type="date" id="priorSleepDateInput" aria-label="Sleep date" title="Sleep date" />
+          <input type="text" id="priorSleepDateInput" readonly aria-label="Sleep date" title="Sleep date" />
           <input type="number" id="priorSleepHoursInput" placeholder="hrs" min="0" max="23" />
           <input type="number" id="priorSleepMinsInput" placeholder="min" min="0" max="59" />
           <div class="star-rating" id="priorSleepRatingInput">
@@ -941,10 +987,19 @@
     <div class="emoji-grid" id="emojiGrid"></div>
   </div>
 
+  <div class="emoji-popover cal-popover" id="calPopover">
+    <div class="cal-head">
+      <button type="button" id="calPrev" aria-label="Previous month">‹</button>
+      <span id="calTitle"></span>
+      <button type="button" id="calNext" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.47.0';
+    const CURRENT_VERSION = '1.47.3';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1043,40 +1098,81 @@
       closeEmojiPicker();
     });
 
-    function openSettings() {
-      const dateInput = document.getElementById('priorSleepDateInput');
-      if (dateInput) {
-        const todayKey = dateKeyLocal(Date.now());
-        dateInput.max = todayKey;
-        if (!dateInput.value) dateInput.value = todayKey;
+    let calView = null;
+
+    function renderCalendar() {
+      const input = document.getElementById('priorSleepDateInput');
+      const todayKey = dateKeyLocal(Date.now());
+      const first = new Date(calView.y, calView.m, 1);
+      document.getElementById('calTitle').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      document.getElementById('calNext').disabled = dateKeyLocal(first.getTime()).slice(0, 7) >= todayKey.slice(0, 7);
+      const grid = document.getElementById('calGrid');
+      grid.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const head = document.createElement('span');
+        head.textContent = new Date(2024, 0, 7 + i).toLocaleDateString(undefined, { weekday: 'narrow' });
+        grid.appendChild(head);
       }
-      syncDateInputScheme();
-      document.getElementById('settingsOverlay').classList.add('open');
+      for (let i = 0; i < first.getDay(); i++) grid.appendChild(document.createElement('span'));
+      const daysInMonth = new Date(calView.y, calView.m + 1, 0).getDate();
+      for (let d = 1; d <= daysInMonth; d++) {
+        const key = dateKeyLocal(new Date(calView.y, calView.m, d).getTime());
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = d;
+        btn.disabled = key > todayKey;
+        btn.classList.toggle('today', key === todayKey);
+        btn.classList.toggle('sel', key === input.value);
+        btn.addEventListener('click', () => {
+          input.value = key;
+          closeCalendar();
+        });
+        grid.appendChild(btn);
+      }
     }
 
-    function syncDateInputScheme() {
-      const el = document.getElementById('priorSleepDateInput');
-      if (!el) return;
-      let bg = '';
-      try {
-        bg = getComputedStyle(el).backgroundColor || '';
-      } catch (e) {
-        bg = '';
-      }
-      const nums = (bg.match(/[\d.]+/g) || []).map(Number);
-      if (nums.length < 3 || (nums[3] !== undefined && nums[3] < 0.5)) {
-        bg = themeColor('--card-bg', '#ffffff');
-      }
-      colorAlphaProbe.style.color = bg;
-      const parts = (getComputedStyle(colorAlphaProbe).color.match(/[\d.]+/g) || []).map(Number);
-      if (parts.length < 3) return;
-      const lum = (0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]) / 255;
-      el.style.colorScheme = lum < 0.5 ? 'dark' : 'light';
+    function openCalendar() {
+      const input = document.getElementById('priorSleepDateInput');
+      const popover = document.getElementById('calPopover');
+      const d = new Date(dayKeyToMs(input.value || dateKeyLocal(Date.now())));
+      calView = { y: d.getFullYear(), m: d.getMonth() };
+      renderCalendar();
+      popover.classList.add('open');
+      const rect = input.getBoundingClientRect();
+      popover.style.top = `${Math.max(4, rect.top - popover.offsetHeight - 4)}px`;
+      popover.style.left = `${Math.max(4, Math.min(rect.left, window.innerWidth - popover.offsetWidth - 4))}px`;
+    }
+
+    function closeCalendar() {
+      document.getElementById('calPopover').classList.remove('open');
+    }
+
+    function shiftCalendar(delta) {
+      const d = new Date(calView.y, calView.m + delta, 1);
+      calView = { y: d.getFullYear(), m: d.getMonth() };
+      renderCalendar();
+    }
+
+    document.getElementById('priorSleepDateInput').addEventListener('click', openCalendar);
+    document.getElementById('calPrev').addEventListener('click', () => shiftCalendar(-1));
+    document.getElementById('calNext').addEventListener('click', () => shiftCalendar(1));
+    document.addEventListener('click', (ev) => {
+      const popover = document.getElementById('calPopover');
+      if (!popover.classList.contains('open')) return;
+      if (popover.contains(ev.target) || ev.target.id === 'priorSleepDateInput') return;
+      closeCalendar();
+    });
+
+    function openSettings() {
+      const dateInput = document.getElementById('priorSleepDateInput');
+      if (!dateInput.value) dateInput.value = dateKeyLocal(Date.now());
+      document.getElementById('settingsOverlay').classList.add('open');
     }
 
     function closeSettings() {
       document.getElementById('settingsOverlay').classList.remove('open');
       closeEmojiPicker();
+      closeCalendar();
     }
 
     function openReports() {
@@ -2505,6 +2601,8 @@
         const habitBucket = i === 0 ? null : state.habitDayHistory && state.habitDayHistory[dayKey];
 
         const statParts = [`${Math.round(dayTotalMg)} mg`];
+        const sleepEntry = state.sleepEntries.find((e) => e.dayKey === dayKey);
+        if (sleepEntry) statParts.push(`${fmtDuration(sleepEntry.durationMin * 60000)} sleep`);
         if (taskBucket && taskBucket.total > 0) {
           const done = taskBucket.doneTimes.length;
           statParts.push(`${done} task${done === 1 ? '' : 's'}`);
@@ -2926,7 +3024,6 @@
       document.getElementById('chartHoursBeforeInput').value = state.chartHoursBefore;
       document.getElementById('chartHoursAfterInput').value = state.chartHoursAfter;
       renderManageDrinks();
-      syncDateInputScheme();
     }
 
     function renderAll() {
