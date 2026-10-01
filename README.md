@@ -53,6 +53,11 @@ caffeine level decay using a half-life model, and its effects on productivity th
 2. In Super Productivity: **Settings → Plugins → Upload Plugin**
 3. Open it from the ☕ header button
 
+## Build
+
+The release zip is minified to stay under Super Productivity's ~100KB
+(uncompressed) plugin size limit: `python3 build_dist.py`
+
 
 ## Notes
 
