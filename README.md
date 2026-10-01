@@ -33,7 +33,7 @@ caffeine level decay using a half-life model, and its effects on productivity th
 - Sleep tracking: log a duration (hrs/min) and a 0-5 star rating; entries
   logged the same day add up into one running daily total, shown with its
   date in the Sleep log (with per-entry removal), and shaded on the
-  daily-breakdown decay panels; Settings has a "Log sleep for prior day"
+  daily-breakdown decay panels; Settings has a "Log sleep for previous day"
   form (date + duration + rating) to backfill missed days
 - Daily breakdown: a full 00:00–24:00 decay/task/habit panel per day, for a
   configurable number of past days (default 7), each labeled with that

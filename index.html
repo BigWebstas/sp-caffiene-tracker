@@ -914,7 +914,7 @@
           </div>
         </div>
 
-        <div class="section-title">Log sleep for prior day</div>
+        <div class="section-title">Log sleep for previous day</div>
         <div class="card sleep-form prior-sleep-form">
           <input type="date" id="priorSleepDateInput" aria-label="Sleep date" title="Sleep date" />
           <input type="number" id="priorSleepHoursInput" placeholder="hrs" min="0" max="23" />
@@ -2952,7 +2952,7 @@
         return;
       }
       if (dayKey > dateKeyLocal(Date.now())) {
-        p.showSnack?.({ msg: 'Pick today or a prior day', type: 'ERROR' });
+        p.showSnack?.({ msg: 'Pick today or a previous day', type: 'ERROR' });
         return;
       }
       const durationMin = (parseFloat(hoursEl.value) || 0) * 60 + (parseFloat(minsEl.value) || 0);
