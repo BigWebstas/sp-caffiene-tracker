@@ -298,6 +298,19 @@
     min-width: 90px;
   }
 
+  .prior-sleep-form {
+    flex-wrap: wrap;
+  }
+
+  .prior-sleep-form input[type="date"] {
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .prior-sleep-form .star-rating {
+    flex-basis: 100%;
+  }
+
   .star-rating {
     display: flex;
     justify-content: center;
@@ -900,6 +913,21 @@
             <button class="btn-primary drink-action-btn" id="addDrinkBtn">Add</button>
           </div>
         </div>
+
+        <div class="section-title">Log sleep for prior day</div>
+        <div class="card sleep-form prior-sleep-form">
+          <input type="date" id="priorSleepDateInput" aria-label="Sleep date" title="Sleep date" />
+          <input type="number" id="priorSleepHoursInput" placeholder="hrs" min="0" max="23" />
+          <input type="number" id="priorSleepMinsInput" placeholder="min" min="0" max="59" />
+          <div class="star-rating" id="priorSleepRatingInput">
+            <button type="button" data-star="1">★</button>
+            <button type="button" data-star="2">★</button>
+            <button type="button" data-star="3">★</button>
+            <button type="button" data-star="4">★</button>
+            <button type="button" data-star="5">★</button>
+          </div>
+          <button class="btn-primary" id="priorSleepAddBtn">Add</button>
+        </div>
       </div>
     </div>
   </div>
@@ -911,7 +939,7 @@
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.44.2';
+    const CURRENT_VERSION = '1.47.0';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1011,6 +1039,12 @@
     });
 
     function openSettings() {
+      const dateInput = document.getElementById('priorSleepDateInput');
+      if (dateInput) {
+        const todayKey = dateKeyLocal(Date.now());
+        dateInput.max = todayKey;
+        if (!dateInput.value) dateInput.value = todayKey;
+      }
       document.getElementById('settingsOverlay').classList.add('open');
     }
 
@@ -1308,6 +1342,7 @@
     }
 
     let sleepRatingValue = 0;
+    let priorSleepRatingValue = 0;
 
     function renderSleepRatingInput() {
       document.querySelectorAll('#sleepRatingInput button').forEach((btn) => {
@@ -1315,21 +1350,29 @@
       });
     }
 
-    function addSleepEntry(durationMin, rating) {
+    function renderPriorSleepRatingInput() {
+      document.querySelectorAll('#priorSleepRatingInput button').forEach((btn) => {
+        btn.classList.toggle('filled', Number(btn.dataset.star) <= priorSleepRatingValue);
+      });
+    }
+
+    function addSleepEntry(durationMin, rating, dayKeyOverride) {
       const now = Date.now();
-      const dayKey = dateKeyLocal(now);
+      const dayKey = dayKeyOverride || dateKeyLocal(now);
+      const time = dayKeyOverride ? dayKeyToMs(dayKey) + 8 * 3600000 : now;
       const existing = state.sleepEntries.find((e) => e.dayKey === dayKey);
       if (existing) {
         existing.durationMin += durationMin;
         existing.rating = rating;
-        existing.time = now;
+        if (time > existing.time) existing.time = time;
       } else {
-        state.sleepEntries.push({ id: newId(), dayKey, time: now, durationMin, rating });
+        state.sleepEntries.push({ id: newId(), dayKey, time, durationMin, rating });
       }
       const cutoff = now - 400 * 24 * 3600000;
       state.sleepEntries = state.sleepEntries.filter((e) => e.time >= cutoff);
       save();
       renderSleepHistory();
+      renderDailyBreakdown();
       renderChart();
     }
 
@@ -1337,6 +1380,7 @@
       state.sleepEntries = state.sleepEntries.filter((e) => e.id !== id);
       save();
       renderSleepHistory();
+      renderDailyBreakdown();
       renderChart();
     }
 
@@ -2874,6 +2918,14 @@
       });
     });
 
+    document.querySelectorAll('#priorSleepRatingInput button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const star = Number(btn.dataset.star);
+        priorSleepRatingValue = priorSleepRatingValue === star ? star - 1 : star;
+        renderPriorSleepRatingInput();
+      });
+    });
+
     document.getElementById('sleepAddBtn').addEventListener('click', () => {
       const hoursEl = document.getElementById('sleepHoursInput');
       const minsEl = document.getElementById('sleepMinsInput');
@@ -2888,6 +2940,32 @@
       sleepRatingValue = 0;
       renderSleepRatingInput();
       p.showSnack?.({ msg: `Logged ${fmtDuration(durationMin * 60000)} of sleep`, type: 'SUCCESS' });
+    });
+
+    document.getElementById('priorSleepAddBtn').addEventListener('click', () => {
+      const dateEl = document.getElementById('priorSleepDateInput');
+      const hoursEl = document.getElementById('priorSleepHoursInput');
+      const minsEl = document.getElementById('priorSleepMinsInput');
+      const dayKey = (dateEl.value || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+        p.showSnack?.({ msg: 'Pick a date for the sleep entry', type: 'ERROR' });
+        return;
+      }
+      if (dayKey > dateKeyLocal(Date.now())) {
+        p.showSnack?.({ msg: 'Pick today or a prior day', type: 'ERROR' });
+        return;
+      }
+      const durationMin = (parseFloat(hoursEl.value) || 0) * 60 + (parseFloat(minsEl.value) || 0);
+      if (durationMin <= 0) {
+        p.showSnack?.({ msg: 'Enter a sleep duration', type: 'ERROR' });
+        return;
+      }
+      addSleepEntry(durationMin, priorSleepRatingValue, dayKey);
+      hoursEl.value = '';
+      minsEl.value = '';
+      priorSleepRatingValue = 0;
+      renderPriorSleepRatingInput();
+      p.showSnack?.({ msg: `Logged ${fmtDuration(durationMin * 60000)} of sleep for ${dayKey}`, type: 'SUCCESS' });
     });
 
     document.getElementById('customAddBtn').addEventListener('click', () => {
