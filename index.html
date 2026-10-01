@@ -305,6 +305,11 @@
   .prior-sleep-form input[type="date"] {
     flex: 1;
     min-width: 130px;
+    color-scheme: light;
+  }
+
+  .prior-sleep-form input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
   }
 
   .prior-sleep-form .star-rating {
@@ -1045,7 +1050,28 @@
         dateInput.max = todayKey;
         if (!dateInput.value) dateInput.value = todayKey;
       }
+      syncDateInputScheme();
       document.getElementById('settingsOverlay').classList.add('open');
+    }
+
+    function syncDateInputScheme() {
+      const el = document.getElementById('priorSleepDateInput');
+      if (!el) return;
+      let bg = '';
+      try {
+        bg = getComputedStyle(el).backgroundColor || '';
+      } catch (e) {
+        bg = '';
+      }
+      const nums = (bg.match(/[\d.]+/g) || []).map(Number);
+      if (nums.length < 3 || (nums[3] !== undefined && nums[3] < 0.5)) {
+        bg = themeColor('--card-bg', '#ffffff');
+      }
+      colorAlphaProbe.style.color = bg;
+      const parts = (getComputedStyle(colorAlphaProbe).color.match(/[\d.]+/g) || []).map(Number);
+      if (parts.length < 3) return;
+      const lum = (0.2126 * parts[0] + 0.7152 * parts[1] + 0.0722 * parts[2]) / 255;
+      el.style.colorScheme = lum < 0.5 ? 'dark' : 'light';
     }
 
     function closeSettings() {
@@ -2900,6 +2926,7 @@
       document.getElementById('chartHoursBeforeInput').value = state.chartHoursBefore;
       document.getElementById('chartHoursAfterInput').value = state.chartHoursAfter;
       renderManageDrinks();
+      syncDateInputScheme();
     }
 
     function renderAll() {
