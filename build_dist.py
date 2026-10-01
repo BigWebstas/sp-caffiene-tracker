@@ -206,7 +206,7 @@ def main():
         "plugin.js": open("plugin.js").read(),
         "README.md": open("README.md").read(),
     }
-    total = sum(len(v) for v in payload.values())
+    total = sum(len(v.encode("utf-8")) for v in payload.values())
     print(f"uncompressed total: {total} bytes (ceiling {SIZE_CEILING})")
     assert total < SIZE_CEILING, "still over the size ceiling!"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
