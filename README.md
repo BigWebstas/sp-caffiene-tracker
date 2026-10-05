@@ -55,7 +55,9 @@ caffeine level decay using a half-life model, and its effects on productivity th
 - Backup/restore in Settings: download all data as JSON, or restore from a
   backup file (validated, and confirmed before it replaces your data)
 - Data synced via `persistDataSynced` / `loadSyncedData`, so history follows
-  you across devices
+  you across devices. Drinks (with costs) and habit marks sync under their own
+  keys, so a background habit update or a stale device can't overwrite your
+  drink settings (needs Super Productivity 18.8+)
 - Update check on open: a 🔔 button appears next to Reports when a newer
   GitHub release exists, linking straight to it
 
