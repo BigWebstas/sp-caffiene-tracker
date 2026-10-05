@@ -1045,7 +1045,7 @@
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.52.1';
+    const CURRENT_VERSION = '1.53.0';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1388,9 +1388,10 @@
       const prevHabitDayHistory = state.habitDayHistory;
       try {
         const raw = await p.loadSyncedData();
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          state = { ...state, ...parsed };
+        if (raw) state = { ...state, ...JSON.parse(raw) };
+        for (const part in SYNC_PARTS) {
+          const partRaw = await p.loadSyncedData(part);
+          if (partRaw) state = { ...state, ...JSON.parse(partRaw) };
         }
       } catch (e) {
         console.error('[Caffeine Tracker] failed to load data', e);
@@ -1442,10 +1443,17 @@
       document.body.classList.remove('is-loading');
     }
 
-    async function save() {
+    const SYNC_PARTS = { drinks: ['drinks'], habits: ['habitMarks', 'habitDayHistory'] };
+
+    function syncPartJson(src, part) {
+      return JSON.stringify(Object.fromEntries(SYNC_PARTS[part].map((f) => [f, src[f]])));
+    }
+
+    async function save(part) {
       if (!hasLoadedOnce) return;
       try {
-        await p.persistDataSynced(JSON.stringify(state));
+        if (part) await p.persistDataSynced(syncPartJson(state, part), part);
+        if (part !== 'habits') await p.persistDataSynced(JSON.stringify(state));
       } catch (e) {
         console.error('[Caffeine Tracker] failed to save data', e);
       }
@@ -1647,7 +1655,7 @@
 
     function addDrink(emoji, label, mg, drinkTimeMin = 0, cost = 0) {
       state.drinks.push({ id: newId(), emoji: emoji || '☕', label, mg, drinkTimeMin, cost });
-      save();
+      save('drinks');
       renderQuickAdd();
       renderManageDrinks();
     }
@@ -1665,7 +1673,7 @@
         }
       }
       d[field] = value;
-      save();
+      save('drinks');
       renderQuickAdd();
       if (affectsHistory) {
         document.querySelectorAll('#history .history-row:not(#todaySleepRow)').forEach((row) => row.remove());
@@ -1681,7 +1689,7 @@
       const d = state.drinks.find((x) => x.id === id);
       if (d) for (const e of drinkEntries(d)) Object.assign(e, { drinkId: id, cost: d.cost || 0 });
       state.drinks = state.drinks.filter((x) => x.id !== id);
-      save();
+      save('drinks');
       renderQuickAdd();
       renderManageDrinks();
     }
@@ -2174,7 +2182,7 @@
         state.habitMarks.total = ids.length;
         changed = true;
       }
-      if (changed) save();
+      if (changed) save('habits');
 
       habitData = {
         total: ids.length,
@@ -3198,6 +3206,7 @@
       );
       if (!ok) return;
       try {
+        for (const part in SYNC_PARTS) await p.persistDataSynced(syncPartJson(data, part), part);
         await p.persistDataSynced(JSON.stringify(data));
       } catch (e) {
         console.error('[Caffeine Tracker] failed to restore backup', e);
