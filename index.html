@@ -221,7 +221,7 @@
 
   .gauge-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     margin-top: var(--s2);
   }
 
@@ -245,6 +245,7 @@
 
   .gauge-stat.container .stat-value,
   .gauge-stat.sipTime .stat-value,
+  .gauge-stat.spent .stat-value,
   .section-title-row .daily-total {
     color: var(--c-primary);
   }
@@ -253,7 +254,7 @@
     color: var(--text-color-muted);
   }
 
-  .gauge-stat.streak .stat-value {
+  .gauge-stat.dailyAvg .stat-value {
     color: #22c55e;
   }
 
@@ -395,7 +396,8 @@
     min-width: 100px;
   }
 
-  .custom-form #customTime {
+  .custom-form #customTime,
+  .custom-form #customCost {
     flex: 0 0 105px;
     min-width: 105px;
   }
@@ -548,7 +550,7 @@
   .drink-row,
   .drink-row-labels {
     display: grid;
-    grid-template-columns: 36px 1fr 90px 64px 68px;
+    grid-template-columns: 36px 1fr 76px 76px 76px 68px;
     align-items: center;
     column-gap: var(--s);
   }
@@ -608,10 +610,22 @@
 
   .drink-row .drink-label-input,
   .drink-row .drink-mg-input,
-  .drink-row .drink-time-input {
+  .drink-row .drink-time-input,
+  .drink-row .drink-cost-input {
     width: 100%;
     box-sizing: border-box;
     min-width: 0;
+  }
+
+  .drink-row input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .drink-row input[type='number']::-webkit-inner-spin-button,
+  .drink-row input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   .drink-row .drink-action-btn {
@@ -657,6 +671,24 @@
 
   .export-btn {
     width: 100%;
+  }
+
+  .summary-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    white-space: nowrap;
+    margin-left: var(--s);
+  }
+
+  .backup-card {
+    display: flex;
+    gap: var(--s);
+    padding: var(--s2);
+  }
+
+  .backup-card button {
+    flex: 1;
   }
 
   .chart-canvas-wrap,
@@ -783,9 +815,13 @@
         <span class="stat-label">Metabolized</span>
         <span class="stat-value" id="metabolizedStat">0 mg</span>
       </div>
-      <div class="gauge-stat streak">
-        <span class="stat-label">Sleep streak</span>
-        <span class="stat-value" id="streakStat">0 days</span>
+      <div class="gauge-stat spent">
+        <span class="stat-label">Spent today</span>
+        <span class="stat-value" id="spentStat">$0.00</span>
+      </div>
+      <div class="gauge-stat dailyAvg">
+        <span class="stat-label">Daily avg</span>
+        <span class="stat-value" id="dailyAvgStat">0 mg</span>
       </div>
     </div>
   </div>
@@ -798,6 +834,7 @@
     <input type="text" id="customName" placeholder="Drink name" />
     <input type="number" id="customMg" placeholder="mg" min="1" />
     <input type="number" id="customTime" placeholder="sip min" min="0" max="240" title="Minutes to consume (0 = instant)" />
+    <input type="number" id="customCost" placeholder="cost" min="0" step="0.01" title="Cost (optional)" />
     <button class="btn-primary" id="customAddBtn">Add</button>
   </div>
 
@@ -953,6 +990,7 @@
             <span>Name</span>
             <span>mg</span>
             <span>min</span>
+            <span>cost</span>
             <span></span>
           </div>
           <div id="drinkList"></div>
@@ -961,6 +999,7 @@
             <input type="text" class="drink-label-input" id="newDrinkLabel" placeholder="Drink name" />
             <input type="number" class="drink-mg-input" id="newDrinkMg" placeholder="mg" min="1" />
             <input type="number" class="drink-time-input" id="newDrinkTime" placeholder="0" min="0" max="240" title="Minutes to consume (0 = instant)" />
+            <input type="number" class="drink-cost-input" id="newDrinkCost" placeholder="0.00" min="0" step="0.01" title="Cost (optional)" />
             <button class="btn-primary drink-action-btn" id="addDrinkBtn">Add</button>
           </div>
         </div>
@@ -978,6 +1017,13 @@
             <button type="button" data-star="5">★</button>
           </div>
           <button class="btn-primary" id="priorSleepAddBtn">Add</button>
+        </div>
+
+        <div class="section-title">Backup</div>
+        <div class="card backup-card">
+          <button class="btn-primary" id="backupBtn">Download backup</button>
+          <button id="restoreBtn">Restore from file</button>
+          <input type="file" id="restoreInput" accept=".json,application/json" hidden />
         </div>
       </div>
     </div>
@@ -999,7 +1045,7 @@
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.47.3';
+    const CURRENT_VERSION = '1.52.1';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1435,14 +1481,34 @@
       });
     }
 
-    function addEntry(label, mg, drinkTimeMin = 0) {
+    function fmtCost(cost) {
+      return `$${cost.toFixed(2)}`;
+    }
+
+    function parseCost(value) {
+      const cost = parseFloat(value);
+      return cost > 0 ? Math.round(cost * 100) / 100 : 0;
+    }
+
+    function entryCost(e) {
+      const d = state.drinks.find((x) => (e.drinkId ? x.id === e.drinkId : x.label === e.label));
+      return d ? d.cost || 0 : e.cost || 0;
+    }
+
+    function totalCost(entries) {
+      return entries.reduce((sum, e) => sum + entryCost(e), 0);
+    }
+
+    function addEntry(label, mg, drinkTimeMin = 0, cost = 0, drinkId = null) {
       const now = Date.now();
       const rampStart = drinkTimeMin > 0 ? cupBusyUntil(now) : now;
       state.entries.push({
         id: newId(),
+        drinkId,
         label,
         mg,
         drinkTimeMin,
+        cost,
         time: now,
         rampStart,
       });
@@ -1495,6 +1561,7 @@
       save();
       renderSleepHistory();
       renderDailyBreakdown();
+      renderHistory();
       renderChart();
     }
 
@@ -1503,6 +1570,7 @@
       save();
       renderSleepHistory();
       renderDailyBreakdown();
+      renderHistory();
       renderChart();
     }
 
@@ -1519,22 +1587,40 @@
         return;
       }
       for (const e of rows) {
-        const row = document.createElement('div');
-        row.className = 'history-row';
         const dateLabel = new Date(dayKeyToMs(e.dayKey)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        const main = document.createElement('span');
-        main.textContent = `${dateLabel} · ${fmtDuration(e.durationMin * 60000)} `;
-        const meta = document.createElement('span');
-        meta.className = 'meta';
-        meta.textContent = starString(e.rating || 0);
-        main.appendChild(meta);
-        row.appendChild(main);
-        const delBtn = document.createElement('button');
-        delBtn.textContent = 'Remove';
-        delBtn.addEventListener('click', () => deleteSleepEntry(e.id));
-        row.appendChild(delBtn);
-        wrap.appendChild(row);
+        wrap.appendChild(buildSleepRow(e, `${dateLabel} · ${fmtDuration(e.durationMin * 60000)}`));
       }
+    }
+
+    function buildSleepRow(e, label) {
+      const row = document.createElement('div');
+      row.className = 'history-row';
+      const main = document.createElement('span');
+      main.textContent = `${label} `;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = starString(e.rating || 0);
+      main.appendChild(meta);
+      row.appendChild(main);
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Remove';
+      delBtn.addEventListener('click', () => deleteSleepEntry(e.id));
+      row.appendChild(delBtn);
+      return row;
+    }
+
+    function renderTodaySleepRow() {
+      const wrap = document.getElementById('history');
+      const e = state.sleepEntries.find((s) => s.dayKey === dateKeyLocal(Date.now()));
+      const existing = document.getElementById('todaySleepRow');
+      const key = e ? `${e.id}|${e.durationMin}|${e.rating || 0}` : '';
+      if (existing && existing.dataset.key === key) return;
+      existing?.remove();
+      if (!e) return;
+      const row = buildSleepRow(e, `🛌 ${fmtDuration(e.durationMin * 60000)}`);
+      row.id = 'todaySleepRow';
+      row.dataset.key = key;
+      wrap.appendChild(row);
     }
 
     function renderQuickAdd() {
@@ -1554,28 +1640,47 @@
         mgSpan.textContent = `${d.mg} mg`;
         btn.append(emojiSpan, labelSpan, mgSpan);
 
-        btn.addEventListener('click', () => addEntry(d.label, d.mg, d.drinkTimeMin || 0));
+        btn.addEventListener('click', () => addEntry(d.label, d.mg, d.drinkTimeMin || 0, d.cost || 0, d.id));
         wrap.appendChild(btn);
       }
     }
 
-    function addDrink(emoji, label, mg, drinkTimeMin = 0) {
-      state.drinks.push({ id: newId(), emoji: emoji || '☕', label, mg, drinkTimeMin });
+    function addDrink(emoji, label, mg, drinkTimeMin = 0, cost = 0) {
+      state.drinks.push({ id: newId(), emoji: emoji || '☕', label, mg, drinkTimeMin, cost });
       save();
       renderQuickAdd();
       renderManageDrinks();
     }
 
+    const HISTORY_DRINK_FIELDS = ['label', 'mg', 'cost'];
+
     function updateDrinkField(id, field, value) {
       const d = state.drinks.find((x) => x.id === id);
       if (!d) return;
+      const affectsHistory = HISTORY_DRINK_FIELDS.includes(field);
+      if (affectsHistory) {
+        for (const e of drinkEntries(d)) {
+          e.drinkId = id;
+          e[field] = value;
+        }
+      }
       d[field] = value;
       save();
       renderQuickAdd();
+      if (affectsHistory) {
+        document.querySelectorAll('#history .history-row:not(#todaySleepRow)').forEach((row) => row.remove());
+        renderAll();
+      }
+    }
+
+    function drinkEntries(d) {
+      return state.entries.filter((e) => e.drinkId === d.id || (!e.drinkId && e.label === d.label));
     }
 
     function removeDrink(id) {
-      state.drinks = state.drinks.filter((d) => d.id !== id);
+      const d = state.drinks.find((x) => x.id === id);
+      if (d) for (const e of drinkEntries(d)) Object.assign(e, { drinkId: id, cost: d.cost || 0 });
+      state.drinks = state.drinks.filter((x) => x.id !== id);
       save();
       renderQuickAdd();
       renderManageDrinks();
@@ -1632,6 +1737,20 @@
           else ev.target.value = d.drinkTimeMin || 0;
         });
 
+        const costInput = document.createElement('input');
+        costInput.type = 'number';
+        costInput.className = 'drink-cost-input';
+        costInput.title = 'Cost (optional)';
+        costInput.min = '0';
+        costInput.step = '0.01';
+        costInput.placeholder = '0.00';
+        costInput.value = d.cost || '';
+        costInput.addEventListener('change', (ev) => {
+          const val = parseCost(ev.target.value);
+          updateDrinkField(d.id, 'cost', val);
+          ev.target.value = val || '';
+        });
+
         const delBtn = document.createElement('button');
         delBtn.className = 'drink-action-btn';
         delBtn.textContent = 'Remove';
@@ -1641,6 +1760,7 @@
         row.appendChild(labelInput);
         row.appendChild(mgInput);
         row.appendChild(timeInput);
+        row.appendChild(costInput);
         row.appendChild(delBtn);
         wrap.appendChild(row);
       }
@@ -1652,16 +1772,16 @@
 
     const numberTweens = new Map();
 
-    function tweenNumber(elId, toValue, suffix, durationMs = 500) {
+    function tweenNumber(elId, toValue, format = (v) => `${Math.round(v)} mg`, durationMs = 500) {
       const el = document.getElementById(elId);
       const prev = numberTweens.get(elId);
       if (prev) cancelAnimationFrame(prev.raf);
-      const fromValue = prev ? prev.current : parseFloat(el.textContent) || 0;
+      const fromValue = prev ? prev.current : parseFloat(el.textContent.replace('$', '')) || 0;
       const start = performance.now();
       const tick = (now) => {
         const t = Math.min((now - start) / durationMs, 1);
         const current = fromValue + (toValue - fromValue) * easeOutCubic(t);
-        el.textContent = `${Math.round(current)}${suffix}`;
+        el.textContent = format(current);
         if (t < 1) {
           numberTweens.set(elId, { raf: requestAnimationFrame(tick), current });
         } else {
@@ -1763,31 +1883,15 @@
       gaugeAnimFrame = requestAnimationFrame(tick);
     }
 
-    function computeSleepStreak() {
+    function computeDailyAvgMg() {
       if (state.entries.length === 0) return 0;
-      const earliestDay = new Date(Math.min(...state.entries.map((e) => e.time)));
-      earliestDay.setHours(0, 0, 0, 0);
-      const earliestMs = earliestDay.getTime();
-
-      const now = Date.now();
-      const sampleStepMs = 15 * 60 * 1000;
-      let streak = 0;
-      for (let i = 0; ; i++) {
-        const dayStart = new Date(now);
-        dayStart.setHours(0, 0, 0, 0);
-        dayStart.setDate(dayStart.getDate() - i);
-        const dayStartMs = dayStart.getTime();
-        if (dayStartMs < earliestMs) break;
-        const dayEndMs = Math.min(dayStartMs + 24 * 3600000 - 1000, now);
-        let dayMax = 0;
-        for (let t = dayStartMs; t < dayEndMs; t += sampleStepMs) {
-          dayMax = Math.max(dayMax, levelAt(t));
-        }
-        dayMax = Math.max(dayMax, levelAt(dayEndMs));
-        if (dayMax >= state.threshold) break;
-        streak++;
-      }
-      return streak;
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const firstDay = new Date(Math.min(...state.entries.map((e) => e.time)));
+      firstDay.setHours(0, 0, 0, 0);
+      const pastDays = Math.round((todayStart - firstDay) / 86400000);
+      const inRange = pastDays > 0 ? state.entries.filter((e) => e.time < todayStart.getTime()) : state.entries;
+      return inRange.reduce((sum, e) => sum + e.mg, 0) / Math.max(pastDays, 1);
     }
 
     let celebrationDay = null;
@@ -1833,7 +1937,7 @@
     function renderLevel() {
       const now = Date.now();
       const level = levelAt(now);
-      tweenNumber('currentLevel', level, ' mg');
+      tweenNumber('currentLevel', level);
       document.getElementById('currentLevel').classList.toggle('high', level > 400);
 
       const sub = document.getElementById('currentSub');
@@ -1849,8 +1953,9 @@
             : `${fmtDuration(remaining)} until under ${state.threshold} mg`;
       }
 
-      const streak = computeSleepStreak();
-      document.getElementById('streakStat').textContent = `${streak} day${streak === 1 ? '' : 's'}`;
+      document.getElementById('dailyAvgStat').textContent = `${Math.round(computeDailyAvgMg())} mg`;
+      const todayStart = new Date(now).setHours(0, 0, 0, 0);
+      tweenNumber('spentStat', totalCost(state.entries.filter((e) => e.time >= todayStart)), fmtCost);
 
       maybeCelebrateThreshold(level, now);
     }
@@ -1865,7 +1970,9 @@
       main.textContent = `${e.label} `;
       const meta = document.createElement('span');
       meta.className = 'meta';
-      meta.textContent = `${e.mg} mg · ${fmtTime(e.time)}${rampNote}`;
+      const cost = entryCost(e);
+      const costNote = cost > 0 ? ` · ${fmtCost(cost)}` : '';
+      meta.textContent = `${e.mg} mg · ${fmtTime(e.time)}${rampNote}${costNote}`;
       main.appendChild(meta);
       row.appendChild(main);
 
@@ -1885,18 +1992,24 @@
         .sort((a, b) => b.time - a.time);
 
       const totalToday = todays.reduce((s, e) => s + e.mg, 0);
-      tweenNumber('dailyTotal', totalToday, ' mg');
+      tweenNumber('dailyTotal', totalToday);
+      renderTodaySleepRow();
 
       const emptyEl = wrap.querySelector('.empty-state');
       if (todays.length === 0) {
-        wrap.querySelectorAll('.history-row').forEach((row) => row.remove());
-        if (!emptyEl) wrap.innerHTML = '<div class="empty-state">Nothing logged yet today</div>';
+        wrap.querySelectorAll('.history-row:not(#todaySleepRow)').forEach((row) => row.remove());
+        if (!emptyEl) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'empty-state';
+          emptyDiv.textContent = 'Nothing logged yet today';
+          wrap.prepend(emptyDiv);
+        }
         return;
       }
       if (emptyEl) emptyEl.remove();
 
       const existingRows = new Map();
-      wrap.querySelectorAll('.history-row').forEach((row) => existingRows.set(row.dataset.id, row));
+      wrap.querySelectorAll('.history-row:not(#todaySleepRow)').forEach((row) => existingRows.set(row.dataset.id, row));
       const todayIds = new Set(todays.map((e) => e.id));
 
       for (const [id, row] of existingRows) {
@@ -2313,8 +2426,12 @@
 
       const totalDosedToday = totalMgToday();
       const metabolizedToday = Math.max(totalDosedToday - levelAt(now), 0);
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const costToday = totalCost(state.entries.filter((e) => e.time >= todayStart.getTime()));
       document.getElementById('chartMetabolizedStat').textContent =
-        totalDosedToday > 0 ? ` · ${Math.round(metabolizedToday)} mg metabolized` : '';
+        (totalDosedToday > 0 ? ` · ${Math.round(metabolizedToday)} mg metabolized` : '') +
+        (costToday > 0 ? ` · ${fmtCost(costToday)} today` : '');
 
       const points = [];
       let maxMg = state.threshold;
@@ -2596,11 +2713,14 @@
         const dayEndMs = dayEnd.getTime();
         const dayKey = dateKeyLocal(dayStartMs);
         const label = i === 0 ? 'Today' : new Date(dayStartMs).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-        const dayTotalMg = state.entries.filter((e) => e.time >= dayStartMs && e.time < dayEndMs).reduce((sum, e) => sum + e.mg, 0);
+        const dayEntries = state.entries.filter((e) => e.time >= dayStartMs && e.time < dayEndMs);
+        const dayTotalMg = dayEntries.reduce((sum, e) => sum + e.mg, 0);
+        const dayCost = totalCost(dayEntries);
         const taskBucket = taskHistory.dayBuckets.get(dayKey);
         const habitBucket = i === 0 ? null : state.habitDayHistory && state.habitDayHistory[dayKey];
 
         const statParts = [`${Math.round(dayTotalMg)} mg`];
+        if (dayCost > 0) statParts.push(fmtCost(dayCost));
         const sleepEntry = state.sleepEntries.find((e) => e.dayKey === dayKey);
         if (sleepEntry) statParts.push(`${fmtDuration(sleepEntry.durationMin * 60000)} sleep`);
         if (taskBucket && taskBucket.total > 0) {
@@ -2756,14 +2876,30 @@
       return Math.max(Math.round((effectiveEnd - start) / (24 * 3600000)), 1);
     }
 
+    function newPeriodTotals(key) {
+      return { key, totalMg: 0, totalCost: 0, count: 0, byDrink: new Map(), sleepMin: 0, sleepNights: 0 };
+    }
+
+    function avgSleepText(r) {
+      return r.sleepNights > 0 ? fmtDuration((r.sleepMin / r.sleepNights) * 60000) : '—';
+    }
+
     function aggregate(period) {
       const map = new Map();
       for (const e of state.entries) {
         const key = periodKey(e.time, period);
-        const cur = map.get(key) || { key, totalMg: 0, count: 0, byDrink: new Map() };
+        const cur = map.get(key) || newPeriodTotals(key);
         cur.totalMg += e.mg;
+        cur.totalCost += entryCost(e);
         cur.count += 1;
         cur.byDrink.set(e.label, (cur.byDrink.get(e.label) || 0) + 1);
+        map.set(key, cur);
+      }
+      for (const e of state.sleepEntries) {
+        const key = periodKey(dayKeyToMs(e.dayKey), period);
+        const cur = map.get(key) || newPeriodTotals(key);
+        cur.sleepMin += e.durationMin;
+        cur.sleepNights += 1;
         map.set(key, cur);
       }
       return Array.from(map.values()).sort(
@@ -2807,15 +2943,25 @@
             : '';
         const topLabel = mostCommonDrink(r.byDrink);
         const topNote = topLabel ? ` · ${drinkEmoji(topLabel)} ${topLabel} most common`.replace('  ', ' ') : '';
+        const costNote =
+          summaryPeriod !== 'day' ? ` · ${fmtCost(r.totalCost / daysInPeriod(r.key, summaryPeriod))}/day` : '';
+        const sleepNote =
+          r.sleepNights > 0 ? ` · 🛌 ${avgSleepText(r)}${summaryPeriod !== 'day' ? ` avg (${r.sleepNights} night${r.sleepNights === 1 ? '' : 's'})` : ''}` : '';
         const main = document.createElement('span');
         main.textContent = `${periodLabel(r.key, summaryPeriod)} `;
         const meta = document.createElement('span');
         meta.className = 'meta';
-        meta.textContent = `${r.count} log${r.count === 1 ? '' : 's'}${avgNote}${topNote}`;
+        meta.textContent = `${r.count} log${r.count === 1 ? '' : 's'}${avgNote}${costNote}${sleepNote}${topNote}`;
         main.appendChild(meta);
+        const totals = document.createElement('span');
+        totals.className = 'summary-totals';
         const mgSpan = document.createElement('span');
         mgSpan.textContent = `${Math.round(r.totalMg)} mg`;
-        row.append(main, mgSpan);
+        const costSpan = document.createElement('span');
+        costSpan.className = 'meta';
+        costSpan.textContent = fmtCost(r.totalCost);
+        totals.append(mgSpan, costSpan);
+        row.append(main, totals);
         wrap.appendChild(row);
       }
     }
@@ -2845,12 +2991,13 @@
       md += `Generated ${now.toLocaleString()}\n\n`;
       md += `Half-life: ${state.halfLifeHours}h · Sleep threshold: ${state.threshold} mg\n\n`;
       md += `## ${periodTitle} totals\n\n`;
-      md += `| Period | Total (mg) | Logs | Avg mg/day | Most common |\n|---|---|---|---|---|\n`;
+      md += `| Period | Total (mg) | Logs | Avg mg/day | Cost | Avg cost/day | Avg sleep | Nights logged | Most common |\n|---|---|---|---|---|---|---|---|---|\n`;
       for (const r of rows) {
         const avg = Math.round(r.totalMg / daysInPeriod(r.key, summaryPeriod));
         const topLabel = mostCommonDrink(r.byDrink);
         const topText = topLabel ? `${drinkEmoji(topLabel)} ${topLabel}`.trim() : '—';
-        md += `| ${escapeMd(periodLabel(r.key, summaryPeriod))} | ${Math.round(r.totalMg)} | ${r.count} | ${avg} | ${escapeMd(topText)} |\n`;
+        const days = daysInPeriod(r.key, summaryPeriod);
+        md += `| ${escapeMd(periodLabel(r.key, summaryPeriod))} | ${Math.round(r.totalMg)} | ${r.count} | ${avg} | ${fmtCost(r.totalCost)} | ${fmtCost(r.totalCost / days)} | ${avgSleepText(r)} | ${r.sleepNights} | ${escapeMd(topText)} |\n`;
       }
       md += `\n`;
 
@@ -2988,17 +3135,15 @@
       return window;
     }
 
-    async function exportReport() {
-      const md = buildExportMarkdown();
-      const filename = `caffeine-report-${new Date().toISOString().slice(0, 10)}.md`;
+    async function saveFile(content, filename, type, title, doneMsg) {
       const win = getHostWindow();
-      const blob = new win.Blob([md], { type: 'text/markdown' });
+      const blob = new win.Blob([content], { type });
 
       if (win.navigator.canShare) {
-        const file = new win.File([blob], filename, { type: 'text/markdown' });
+        const file = new win.File([blob], filename, { type });
         if (win.navigator.canShare({ files: [file] })) {
           try {
-            await win.navigator.share({ files: [file], title: 'Caffeine Tracker Report' });
+            await win.navigator.share({ files: [file], title });
             return;
           } catch (e) {
             if (e && e.name === 'AbortError') return;
@@ -3014,7 +3159,55 @@
       a.click();
       win.document.body.removeChild(a);
       win.URL.revokeObjectURL(url);
-      p.showSnack?.({ msg: 'Report exported', type: 'SUCCESS' });
+      p.showSnack?.({ msg: doneMsg, type: 'SUCCESS' });
+    }
+
+    const todayIso = () => new Date().toISOString().slice(0, 10);
+
+    function exportReport() {
+      saveFile(buildExportMarkdown(), `caffeine-report-${todayIso()}.md`, 'text/markdown', 'Caffeine Tracker Report', 'Report exported');
+    }
+
+    function downloadBackup() {
+      saveFile(JSON.stringify(state), `caffeine-backup-${todayIso()}.json`, 'application/json', 'Caffeine Tracker Backup', 'Backup saved');
+    }
+
+    function isValidBackup(data) {
+      const isNum = (v) => typeof v === 'number' && isFinite(v);
+      return (
+        data && typeof data === 'object' && !Array.isArray(data) &&
+        Array.isArray(data.entries) && data.entries.every((e) => e && isNum(e.time) && isNum(e.mg) && typeof e.label === 'string') &&
+        Array.isArray(data.drinks) && data.drinks.every((d) => d && isNum(d.mg) && typeof d.label === 'string') &&
+        (data.sleepEntries === undefined || (Array.isArray(data.sleepEntries) && data.sleepEntries.every((e) => e && isNum(e.durationMin) && typeof e.dayKey === 'string')))
+      );
+    }
+
+    async function restoreBackup(file) {
+      let data;
+      try {
+        data = JSON.parse(await file.text());
+      } catch (e) {
+        data = null;
+      }
+      if (!isValidBackup(data)) {
+        p.showSnack?.({ msg: 'Not a valid Caffeine Tracker backup', type: 'ERROR' });
+        return;
+      }
+      const ok = confirm(
+        `Replace ALL current data with this backup (${data.entries.length} drinks logged, ${(data.sleepEntries || []).length} nights of sleep)? This also syncs to your other devices.`,
+      );
+      if (!ok) return;
+      try {
+        await p.persistDataSynced(JSON.stringify(data));
+      } catch (e) {
+        console.error('[Caffeine Tracker] failed to restore backup', e);
+        p.showSnack?.({ msg: 'Restore failed', type: 'ERROR' });
+        return;
+      }
+      state.habitMarks = { day: null, marks: {}, total: 0 };
+      state.habitDayHistory = {};
+      await load();
+      p.showSnack?.({ msg: 'Backup restored', type: 'SUCCESS' });
     }
 
     function renderSettings() {
@@ -3096,14 +3289,16 @@
       const nameEl = document.getElementById('customName');
       const mgEl = document.getElementById('customMg');
       const timeEl = document.getElementById('customTime');
+      const costEl = document.getElementById('customCost');
       const name = nameEl.value.trim() || 'Custom';
       const mg = parseFloat(mgEl.value);
       const drinkTimeMin = Math.max(parseFloat(timeEl.value) || 0, 0);
       if (!validateMg(mg)) return;
-      addEntry(name, mg, drinkTimeMin);
+      addEntry(name, mg, drinkTimeMin, parseCost(costEl.value));
       nameEl.value = '';
       mgEl.value = '';
       timeEl.value = '';
+      costEl.value = '';
     });
 
     bindNumberSetting('halfLifeInput', 'halfLifeHours', 2, 10);
@@ -3131,6 +3326,7 @@
       const labelEl = document.getElementById('newDrinkLabel');
       const mgEl = document.getElementById('newDrinkMg');
       const timeEl = document.getElementById('newDrinkTime');
+      const costEl = document.getElementById('newDrinkCost');
       const label = labelEl.value.trim();
       const mg = parseFloat(mgEl.value);
       const drinkTimeMin = Math.max(parseFloat(timeEl.value) || 0, 0);
@@ -3139,12 +3335,13 @@
         return;
       }
       if (!validateMg(mg)) return;
-      addDrink(newDrinkEmoji, label, mg, drinkTimeMin);
+      addDrink(newDrinkEmoji, label, mg, drinkTimeMin, parseCost(costEl.value));
       newDrinkEmoji = '☕';
       newDrinkEmojiBtn.textContent = '☕';
       labelEl.value = '';
       mgEl.value = '';
       timeEl.value = '';
+      costEl.value = '';
     });
 
     document.getElementById('periodToggle').addEventListener('click', (ev) => {
@@ -3156,6 +3353,14 @@
     });
 
     document.getElementById('exportBtn').addEventListener('click', exportReport);
+    document.getElementById('backupBtn').addEventListener('click', downloadBackup);
+    const restoreInput = document.getElementById('restoreInput');
+    document.getElementById('restoreBtn').addEventListener('click', () => restoreInput.click());
+    restoreInput.addEventListener('change', () => {
+      const file = restoreInput.files[0];
+      restoreInput.value = '';
+      if (file) restoreBackup(file);
+    });
 
     window.addEventListener('resize', () => {
       renderGauge();

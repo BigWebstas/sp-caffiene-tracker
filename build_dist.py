@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Build dist/caffeine-tracker-v<version>.zip under SP's 100k ceiling.
+"""Build dist/caffeine-tracker-v<version>.zip under SP's 100 KiB ceiling.
 
-Super Productivity enforces the ~100KB plugin size limit on the
-*uncompressed* files, so the zip must contain a minified index.html.
+Super Productivity rejects any *uncompressed* manifest.json, index.html or
+icon over MAX_PLUGIN_MANIFEST_SIZE (100 KiB, per file, see plugin.const.ts),
+so the zip must contain a minified index.html.
 The repo source stays readable; only the packaged copy is minified.
 
 Minification is whitespace-only outside of JS strings/template literals
@@ -18,7 +19,8 @@ import re
 import zipfile
 
 SRC_FILES = ["icon.svg", "index.html", "manifest.json", "plugin.js", "README.md"]
-SIZE_CEILING = 100_000
+SIZE_CEILING = 100 * 1024
+CAPPED_FILES = ["icon.svg", "index.html", "manifest.json"]
 
 
 def minify_html_css(segment):
@@ -206,9 +208,10 @@ def main():
         "plugin.js": open("plugin.js").read(),
         "README.md": open("README.md").read(),
     }
-    total = sum(len(v.encode("utf-8")) for v in payload.values())
-    print(f"uncompressed total: {total} bytes (ceiling {SIZE_CEILING})")
-    assert total < SIZE_CEILING, "still over the size ceiling!"
+    for name in CAPPED_FILES:
+        size = len(payload[name].encode("utf-8"))
+        print(f"{name}: {size} bytes (ceiling {SIZE_CEILING})")
+        assert size <= SIZE_CEILING, f"{name} is over the size ceiling!"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in payload.items():
             z.writestr(name, data)

@@ -1,4 +1,4 @@
-  # Caffeine Tracker
+# Caffeine Tracker
 
 A Super Productivity plugin that logs caffeine intake and simulates blood
 caffeine level decay using a half-life model, and its effects on productivity throughout the day.
@@ -17,11 +17,21 @@ caffeine level decay using a half-life model, and its effects on productivity th
 
 ## Features
 
-- Sleep Streak shows consecutive days you stayed under your sleep threshold
+- Gauge stats: left in cup, sip time left, metabolized, live "Spent today"
+  cost, and Daily Avg (average caffeine per day across past days, first log
+  through yesterday)
+- Cost tracking: set a cost per drink in Manage drinks (or per custom entry);
+  costs are calculated live from your drink settings, so changing a price
+  updates all history. Shown in Today's log, the decay chart legend, the
+  daily breakdown, and the report summary (total plus per-day average)
+- Editing a drink's name, mg, or cost in Manage drinks recalculates every
+  past entry of that drink
 - Reporting with export to markdown includes mermaid charts to show graphing
   data, including a combined decay-curve chart (caffeine plus task/habit
   remaining-lines, scaled onto the same axis) over the same window as the
-  on-screen chart, and a Sleep log table
+  on-screen chart, cost and average-sleep columns, and a Sleep log table
+- Report summary (day/week/month/year) with caffeine, cost, and average sleep
+  per period
 - Quick-add buttons for common drinks (coffee, espresso, tea, energy drink,
   soda, pre-workout) plus a custom name/mg entry
 - Live current caffeine level (mg), recomputed from every logged dose using
@@ -41,7 +51,9 @@ caffeine level decay using a half-life model, and its effects on productivity th
 - Adjustable half-life (default 5h, the commonly cited average), threshold
   (default 50mg), daily-breakdown window, and the decay chart's hours-before/
   hours-after window (default 4h/18h)
-- Today's log with per-entry removal
+- Today's log with per-entry removal, plus today's sleep pinned at the bottom
+- Backup/restore in Settings: download all data as JSON, or restore from a
+  backup file (validated, and confirmed before it replaces your data)
 - Data synced via `persistDataSynced` / `loadSyncedData`, so history follows
   you across devices
 - Update check on open: a 🔔 button appears next to Reports when a newer
@@ -55,8 +67,8 @@ caffeine level decay using a half-life model, and its effects on productivity th
 
 ## Build
 
-The release zip is minified to stay under Super Productivity's ~100KB
-(uncompressed) plugin size limit: `python3 build_dist.py`
+The release zip is minified to stay under Super Productivity's 100 KiB
+per-file limit on the uncompressed `index.html`: `python3 build_dist.py`
 
 
 ## Notes
