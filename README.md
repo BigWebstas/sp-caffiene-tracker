@@ -11,7 +11,7 @@ caffeine level decay using a half-life model, and its effects on productivity th
 </p>
 <p>
   <img src="Images/mobile.png" alt="Mobile view: gauge with Spent today and Daily avg, quick add, and custom drink entry with cost" width="31%" />
-  <img src="Images/mobile_settings.png" alt="Mobile view: Settings &amp; drinks overlay with drink costs and backup/restore" width="31%" />
+  <img src="Images/mobile_settings.png" alt="Mobile view: Settings &amp; drinks overlay with drink costs and log drink for previous day" width="31%" />
   <img src="Images/mobile_reports.png" alt="Mobile view: Reports summary with sleep, mg, and cost per day" width="31%" />
 </p>
 
