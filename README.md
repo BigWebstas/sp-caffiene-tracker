@@ -6,8 +6,8 @@ caffeine level decay using a half-life model, and its effects on productivity th
 ## Screenshots
 
 <p>
-  <img src="Images/desktop2.png" alt="Desktop view: gauge and quick add" width="49%" />
-  <img src="Images/desktop1.png" alt="Desktop view: decay chart, log, and settings" width="49%" />
+  <img src="Images/desktop1.png" alt="Desktop view: gauge with Spent today and Daily avg, quick add, custom drink with cost, and sleep entry" width="100%" />
+  <img src="Images/desktop2.png" alt="Desktop view: decay curve with task and habit burndown, cost and sleep in the legend, and today's log with drink cost and pinned sleep row" width="100%" />
 </p>
 <p>
   <img src="Images/mobile.png" alt="Mobile view: gauge with Spent today and Daily avg, quick add, and custom drink entry with cost" width="31%" />
