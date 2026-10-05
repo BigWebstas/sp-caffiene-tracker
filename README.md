@@ -45,6 +45,8 @@ caffeine level decay using a half-life model, and its effects on productivity th
   date in the Sleep log (with per-entry removal), and shaded on the
   daily-breakdown decay panels; Settings has a "Log sleep for previous day"
   form (date + duration + rating) to backfill missed days
+- Log a drink for a previous day: Settings has a "Log drink for previous day"
+  form (date + time + saved drink) to backfill missed drinks
 - Daily breakdown: a full 00:00–24:00 decay/task/habit panel per day, for a
   configurable number of past days (default 7), each labeled with that
   day's mg total, tasks completed/% scheduled, and habits completed/total
