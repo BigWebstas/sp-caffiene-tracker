@@ -303,7 +303,7 @@
     flex-wrap: wrap;
   }
 
-  .prior-sleep-form #priorSleepDateInput {
+  .prior-sleep-form .cal-input {
     flex: 1;
     min-width: 130px;
     cursor: pointer;
@@ -1004,9 +1004,17 @@
           </div>
         </div>
 
+        <div class="section-title">Log drink for previous day</div>
+        <div class="card sleep-form prior-sleep-form">
+          <input type="text" class="cal-input" id="priorDrinkDateInput" readonly aria-label="Drink date" title="Drink date" />
+          <input type="time" id="priorDrinkTimeInput" value="08:00" aria-label="Time" />
+          <select id="priorDrinkSelect" aria-label="Drink"></select>
+          <button class="btn-primary" id="priorDrinkAddBtn">Add</button>
+        </div>
+
         <div class="section-title">Log sleep for previous day</div>
         <div class="card sleep-form prior-sleep-form">
-          <input type="text" id="priorSleepDateInput" readonly aria-label="Sleep date" title="Sleep date" />
+          <input type="text" class="cal-input" id="priorSleepDateInput" readonly aria-label="Sleep date" title="Sleep date" />
           <input type="number" id="priorSleepHoursInput" placeholder="hrs" min="0" max="23" />
           <input type="number" id="priorSleepMinsInput" placeholder="min" min="0" max="59" />
           <div class="star-rating" id="priorSleepRatingInput">
@@ -1045,7 +1053,7 @@
   <script>
     const p = PluginAPI;
 
-    const CURRENT_VERSION = '1.53.0';
+    const CURRENT_VERSION = '1.54.0';
     const REPO = 'BigWebstas/sp-caffiene-tracker';
 
     function isNewerVersion(a, b) {
@@ -1145,9 +1153,10 @@
     });
 
     let calView = null;
+    let calInput = null;
 
     function renderCalendar() {
-      const input = document.getElementById('priorSleepDateInput');
+      const input = calInput;
       const todayKey = dateKeyLocal(Date.now());
       const first = new Date(calView.y, calView.m, 1);
       document.getElementById('calTitle').textContent = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -1177,8 +1186,8 @@
       }
     }
 
-    function openCalendar() {
-      const input = document.getElementById('priorSleepDateInput');
+    function openCalendar(ev) {
+      const input = (calInput = ev.target);
       const popover = document.getElementById('calPopover');
       const d = new Date(dayKeyToMs(input.value || dateKeyLocal(Date.now())));
       calView = { y: d.getFullYear(), m: d.getMonth() };
@@ -1199,19 +1208,18 @@
       renderCalendar();
     }
 
-    document.getElementById('priorSleepDateInput').addEventListener('click', openCalendar);
+    document.querySelectorAll('.cal-input').forEach((el) => el.addEventListener('click', openCalendar));
     document.getElementById('calPrev').addEventListener('click', () => shiftCalendar(-1));
     document.getElementById('calNext').addEventListener('click', () => shiftCalendar(1));
     document.addEventListener('click', (ev) => {
       const popover = document.getElementById('calPopover');
       if (!popover.classList.contains('open')) return;
-      if (popover.contains(ev.target) || ev.target.id === 'priorSleepDateInput') return;
+      if (popover.contains(ev.target) || ev.target.classList.contains('cal-input')) return;
       closeCalendar();
     });
 
     function openSettings() {
-      const dateInput = document.getElementById('priorSleepDateInput');
-      if (!dateInput.value) dateInput.value = dateKeyLocal(Date.now());
+      document.querySelectorAll('.cal-input').forEach((el) => (el.value ||= dateKeyLocal(Date.now())));
       document.getElementById('settingsOverlay').classList.add('open');
     }
 
@@ -1507,9 +1515,9 @@
       return entries.reduce((sum, e) => sum + entryCost(e), 0);
     }
 
-    function addEntry(label, mg, drinkTimeMin = 0, cost = 0, drinkId = null) {
-      const now = Date.now();
-      const rampStart = drinkTimeMin > 0 ? cupBusyUntil(now) : now;
+    function addEntry(label, mg, drinkTimeMin = 0, cost = 0, drinkId = null, at = 0) {
+      const now = at || Date.now();
+      const rampStart = drinkTimeMin > 0 && !at ? cupBusyUntil(now) : now;
       state.entries.push({
         id: newId(),
         drinkId,
@@ -1695,6 +1703,9 @@
     }
 
     function renderManageDrinks() {
+      document.getElementById('priorDrinkSelect').replaceChildren(
+        ...state.drinks.map((d) => Object.assign(document.createElement('option'), { value: d.id, textContent: `${d.emoji} ${d.label}` })),
+      );
       const wrap = document.getElementById('drinkList');
       wrap.innerHTML = '';
       for (const d of state.drinks) {
@@ -3266,6 +3277,16 @@
       sleepRatingValue = 0;
       renderSleepRatingInput();
       p.showSnack?.({ msg: `Logged ${fmtDuration(durationMin * 60000)} of sleep`, type: 'SUCCESS' });
+    });
+
+    document.getElementById('priorDrinkAddBtn').addEventListener('click', () => {
+      const at = new Date(`${document.getElementById('priorDrinkDateInput').value}T${document.getElementById('priorDrinkTimeInput').value}`).getTime();
+      const d = state.drinks.find((x) => x.id === document.getElementById('priorDrinkSelect').value);
+      if (!d || !(at <= Date.now())) {
+        p.showSnack?.({ msg: 'Pick a drink and a time that has already passed', type: 'ERROR' });
+        return;
+      }
+      addEntry(d.label, d.mg, d.drinkTimeMin || 0, d.cost || 0, d.id, at);
     });
 
     document.getElementById('priorSleepAddBtn').addEventListener('click', () => {
